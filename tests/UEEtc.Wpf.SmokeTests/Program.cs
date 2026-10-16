@@ -37,6 +37,11 @@ internal static class Program
             cpuPath.Text = root; cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert(!cpuPath.IsEnabled, "CPU locks inputs"); Wait(cpuAnalyze);
             var cpuFile = (FileAnalysis)((DataGrid)cpu.FindName("FileList")).SelectedItem;
+            Assert(cpuFile.AddedCpuScopes == 0, "Focused CPU skips this tiny branch wrapper by default");
+            var allFunctions = (CheckBox)cpu.FindName("AllFunctionsOption");
+            allFunctions.IsChecked = true; allFunctions.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+            cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(cpuAnalyze);
+            cpuFile = (FileAnalysis)((DataGrid)cpu.FindName("FileList")).SelectedItem;
             Assert(cpuFile.AddedCpuScopes == 1 && cpuFile.AddedCallCounters == 0, "CPU adds scopes only");
             Assert(!cpuFile.ProposedText.Contains("TRACE_COUNTER_INCREMENT"), "CPU never inserts event counts");
             Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"F Work\")"), "CPU label is class and function");
@@ -53,6 +58,7 @@ internal static class Program
             var list = (DataGrid)events.FindName("CandidateList");
             var rows = ((IEnumerable<CandidateRow>)list.ItemsSource).ToArray();
             Assert(rows.Length == 2 && rows.All(r => !r.Selected), "Two branch candidates, none selected");
+            Assert(ReferenceEquals(((FrameworkElement)events.FindName("QuantityEditor")).DataContext, rows[0]), "Quantity editor binds the highlighted candidate");
             Assert(!FindButton(events, "ApplyButton").IsEnabled, "Discovery cannot be applied");
             Assert(((TextBox)events.FindName("ContextText")).Text.Contains("bCacheHit"), "Candidate context includes condition");
             rows[0].Selected = true; rows[0].CounterName = "VerifiedCacheHitCount"; rows[0].DisplayName = "Cache/VerifiedHits";
@@ -62,16 +68,26 @@ internal static class Program
             Assert(preview.Split("TRACE_COUNTER_INCREMENT").Length == 2, "Only selected branch added");
             Assert(!preview.Contains("CpuProfilerTrace.h"), "Events do not add CPU tracing");
             Assert(FindButton(events, "ApplyButton").IsEnabled && FindButton(events, "ExportButton").IsEnabled, "Reviewed plan enables apply/export");
+            rows[0].QuantityEnabled = true; rows[0].QuantityName = "TransferredItems";
+            rows[0].QuantityDisplay = "Cache/Items"; rows[0].QuantityValue = "4";
+            rows[0].QuantityUnit = "items"; rows[0].MeaningConfirmed = true;
+            Assert(((ComboBox)events.FindName("QuantityValueInput")).Text == "4", "Quantity value binding reflects edited model");
+            Assert(!FindButton(events, "ApplyButton").IsEnabled, "Quantity edit invalidates plan");
+            previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
+            Assert(((TextBox)events.FindName("PreviewText")).Text.Contains("TRACE_COUNTER_ADD(TransferredItems, 4)"), "Quantity reaches generated preview");
             ((TextBox)events.FindName("FilterText")).Text = "does-not-match";
             Assert(list.Items.Count == 0 && rows[0].Selected, "Filtering does not change selection");
             ((TextBox)events.FindName("FilterText")).Text = "";
             Assert(list.Items.Count == 2, "Clearing filter restores candidates");
+            list.SelectedItem = rows[0];
             if (args.Length > 0)
             {
                 Directory.CreateDirectory(args[0]);
                 Screenshot(home, Path.Combine(args[0], "home.png"), 800, 450);
                 Screenshot(cpu, Path.Combine(args[0], "cpu.png"), 1200, 750);
                 Screenshot(events, Path.Combine(args[0], "events.png"), 1240, 830);
+                ((TabItem)events.FindName("QuantityTab")).IsSelected = true;
+                Screenshot(events, Path.Combine(args[0], "quantity.png"), 1240, 830);
             }
             rows[0].CounterName = "ChangedName";
             Assert(!FindButton(events, "ApplyButton").IsEnabled && !FindButton(events, "ExportButton").IsEnabled, "Name edit invalidates preview");
@@ -85,6 +101,7 @@ internal static class Program
                 var restartedRows = ((IEnumerable<CandidateRow>)((DataGrid)restarted.FindName("CandidateList")).ItemsSource).ToArray();
                 Assert(restartedRows[0].CounterName == "ChangedName" && restartedRows[0].DisplayName == "Cache/VerifiedHits", "Edited candidate names are restored");
                 Assert(restartedRows.All(r => !r.Selected) && !FindButton(restarted, "ApplyButton").IsEnabled, "Restart never restores selected sites or an applicable plan");
+                Assert(restartedRows.All(r => !r.QuantityEnabled && !r.MeaningConfirmed), "Restart requires fresh quantity confirmation");
             }
             finally { restarted.Close(); }
             previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);

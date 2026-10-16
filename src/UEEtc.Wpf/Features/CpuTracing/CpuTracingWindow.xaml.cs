@@ -51,7 +51,7 @@ public partial class CpuTracingWindow : Window
         PreviewText.Text = OriginalText.Text = DiagnosticsText.Text = "";
         FunctionList.ItemsSource = null;
         string root = SourcePath.Text.Trim();
-        var options = new InstrumentationOptions(true, false);
+        var options = new InstrumentationOptions(true, false, FocusedCpu: AllFunctionsOption.IsChecked != true);
         using var tokenSource = new CancellationTokenSource();
         cancellation = tokenSource;
         SetBusy(true, canCancel: true);
@@ -122,7 +122,7 @@ public partial class CpuTracingWindow : Window
     private void SetBusy(bool value, bool canCancel = false)
     {
         busy = value;
-        SourcePath.IsEnabled = BrowseButton.IsEnabled = AnalyzeButton.IsEnabled = !value;
+        SourcePath.IsEnabled = BrowseButton.IsEnabled = AnalyzeButton.IsEnabled = AllFunctionsOption.IsEnabled = !value;
         CancelButton.IsEnabled = value && canCancel;
         ExportButton.IsEnabled = !value && plan is not null;
         ApplyButton.IsEnabled = !value && plan is { ChangedFiles: > 0, DiagnosticCount: 0 };

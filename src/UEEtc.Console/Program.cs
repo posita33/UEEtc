@@ -12,10 +12,12 @@ static int Run(string[] arguments)
     if (arguments.Length == 0 || arguments is ["--help"] or ["-h"])
     {
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
-        Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--all-functions] [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("cpu defaults to static-evidence filtering (loops, known data/wait APIs, 4+ action calls). Cost is not measured. --all-functions retains broad instrumentation.");
         Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("counters: discover braced if/else branches; select none by default. --report exports candidates.json and an empty selection.json.");
         Console.WriteLine("Copy reviewed Id / CounterName / DisplayName into Selections; --selection validates the source fingerprint before preview/apply.");
+        Console.WriteLine("Optional Quantity: { CounterName, DisplayName, Value, Unit, MeaningConfirmed: true }. Value: listed AddValues or decimal uint32 constant. Count and quantity are separate metrics.");
         Console.WriteLine("CPU and event counters are separate features. Counters measure selected branch entries, not inferred successes.");
         Console.WriteLine("Legacy entry-count commands (retained for existing scripts):");
         Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only | --both] [--report <output-full-path>] [--apply]");
@@ -37,14 +39,16 @@ static int Run(string[] arguments)
         string root = arguments[0];
         bool apply = false;
         string? report = null;
-        InstrumentationOptions options = new();
+        InstrumentationOptions options = new(FocusedCpu: cpuCommand);
         bool modeChosen = false;
         for (int i = 1; i < arguments.Length; i++)
         {
             switch (arguments[i])
             {
                 case "--cpu-only" when !modeChosen:
-                    options = new(true, false); modeChosen = true; break;
+                    options = options with { CpuScopes = true, CallCounters = false }; modeChosen = true; break;
+                case "--all-functions" when cpuCommand && options.FocusedCpu:
+                    options = options with { FocusedCpu = false }; break;
                 case "--counter-only" when !modeChosen && !cpuCommand:
                     options = new(false, true); modeChosen = true; break;
                 case "--both" when !modeChosen && !cpuCommand:
