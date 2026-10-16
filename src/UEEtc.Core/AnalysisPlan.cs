@@ -4,7 +4,12 @@ namespace UEEtc.Core;
 
 public sealed record InstrumentationOptions(bool CpuScopes = true, bool CallCounters = true);
 
-public sealed record FunctionAnalysis(string Name, int Line, string Status, string Reason, string? Counter = null);
+public sealed record FunctionAnalysis(string Name, int Line, string Status, string Reason, string? Counter = null)
+{
+    internal string? CounterBaseName { get; init; }
+    internal string? CounterIdentity { get; init; }
+    internal string? CounterHash { get; init; }
+}
 
 public sealed record FileAnalysis(string RelativePath, IReadOnlyList<FunctionAnalysis> Functions,
     IReadOnlyList<string> Diagnostics)
