@@ -4,6 +4,7 @@ using Microsoft.Win32;
 using UEEtc.Core.Features.FunctionTracing;
 using UEEtc.Core.Plans;
 using UEEtc.Core.Reporting;
+using UEEtc.Wpf.InputAssistance;
 
 namespace UEEtc.Wpf.Features.CpuTracing;
 
@@ -15,7 +16,16 @@ public partial class CpuTracingWindow : Window
     private bool busy;
     public bool IsBusy => busy;
 
-    public CpuTracingWindow() => InitializeComponent();
+    private readonly RememberedInputs inputs;
+    public CpuTracingWindow() : this(InputSettingsStore.Default) { }
+    public CpuTracingWindow(InputSettingsStore settings)
+    {
+        InitializeComponent();
+        inputs = new(this, settings, text => StatusText.Text = text);
+        inputs.Bind(SourcePath, "CpuTracing.SourcePath");
+        FolderDropInput.Attach(SourcePath, text => StatusText.Text = text);
+        inputs.ReportLoadError();
+    }
 
     private void InputsChanged(object sender, RoutedEventArgs e)
     {

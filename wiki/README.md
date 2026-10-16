@@ -8,6 +8,8 @@ status: todo
 
 Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録です。
 
+- [入力保存とフォルダードロップ（Issue #16）](input-assistance.md)
+
 - [UE 5.8 のマクロ使用条件と付与方針](tracing/engine-research.md)
 - [Engine のカウンター名の共有・重複傾向と命名改善（Issue #3）](tracing/counter-naming.md)
 - [共通コア・WPF・Console の設計と使い方](tracing/implementation.md)

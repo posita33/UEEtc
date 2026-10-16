@@ -10,6 +10,7 @@ using UEEtc.Core.Plans;
 using UEEtc.Wpf;
 using UEEtc.Wpf.Features.CpuTracing;
 using UEEtc.Wpf.Features.EventCounters;
+using UEEtc.Wpf.InputAssistance;
 
 internal static class Program
 {
@@ -22,7 +23,8 @@ internal static class Program
         string root = Path.Combine(parent, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         const string source = "#include \"Fixture.h\"\nvoid F::Work() { Super::Work(); if (bCacheHit) { Hit(); } else { Miss(); } }\n";
         File.WriteAllText(Path.Combine(root, "Fixture.cpp"), source, new UTF8Encoding(false));
-        var home = new MainWindow();
+        var settings = new InputSettingsStore(Path.Combine(root, "input-settings.json"));
+        var home = new MainWindow(settings);
         try
         {
             home.Show();
@@ -73,12 +75,25 @@ internal static class Program
             }
             rows[0].CounterName = "ChangedName";
             Assert(!FindButton(events, "ApplyButton").IsEnabled && !FindButton(events, "ExportButton").IsEnabled, "Name edit invalidates preview");
+            settings.Flush();
+            var restarted = new EventCountersWindow(new InputSettingsStore(settings.Path));
+            try
+            {
+                Assert(((TextBox)restarted.FindName("SourcePath")).Text == root, "Event source survives application restart");
+                var restartAnalyze = FindButton(restarted, "AnalyzeButton");
+                restartAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(restartAnalyze);
+                var restartedRows = ((IEnumerable<CandidateRow>)((DataGrid)restarted.FindName("CandidateList")).ItemsSource).ToArray();
+                Assert(restartedRows[0].CounterName == "ChangedName" && restartedRows[0].DisplayName == "Cache/VerifiedHits", "Edited candidate names are restored");
+                Assert(restartedRows.All(r => !r.Selected) && !FindButton(restarted, "ApplyButton").IsEnabled, "Restart never restores selected sites or an applicable plan");
+            }
+            finally { restarted.Close(); }
             previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
             rows[0].Selected = false;
             Assert(!FindButton(events, "ApplyButton").IsEnabled, "Selection edit invalidates preview");
             eventPath.Text += "-changed";
             Assert(list.ItemsSource is null && !previewButton.IsEnabled, "Source edit clears event candidates");
             Assert(File.ReadAllText(Path.Combine(root, "Fixture.cpp")) == source, "All previews preserve original source");
+            InputAssistanceTests.Run(root, Assert);
             Console.WriteLine($"WPF smoke: {checks} checks passed (launcher, separate windows, selection, naming, filtering, invalidation, source unchanged).");
             return 0;
         }
