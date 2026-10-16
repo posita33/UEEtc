@@ -6,6 +6,8 @@ status: todo
 
 # CPU 対象の絞り込みと数量 ADD（Issue #18・#21）
 
+画面の操作・数量の推奨表示は [Issue #23〜#25 の更新](preview-selection-and-indentation.md) を参照してください。以下は初回実装時点の調査と制約です。
+
 [目次](../README.md) / [CPU 配置](cpu-scope-policy.md) / [イベント選択](event-counters.md)
 
 ## Engine 調査

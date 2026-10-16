@@ -66,7 +66,8 @@ public static class ReportExporter
     }
 
     public static string Summary(AnalysisPlan plan) =>
-        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 箇所付与（CPU {plan.AddedCpuScopes} / 進入回数 {plan.AddedCallCounters} / イベント {plan.AddedEventCounters} / 数量 ADD {plan.AddedQuantityCounters}） / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断";
+        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 箇所付与（CPU {plan.AddedCpuScopes} / 進入回数 {plan.AddedCallCounters} / イベント {plan.AddedEventCounters} / 数量 ADD {plan.AddedQuantityCounters}） / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断" +
+        (plan.RequiresQuantityConfirmation ? " / 数量ADD未確認（適用不可）" : "");
 
     private static string[] Lines(string text) => text.Length == 0 ? [] :
         (text.EndsWith('\n') ? text[..^1] : text).Split('\n');

@@ -73,9 +73,11 @@ dotnet run --project src/UEEtc.Console -- cpu "D:/Projects/posita/git/Game/Block
 dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/TraceReports/discovery"
 ```
 
-WPF ではメイン画面から機能を選び、ソースフォルダーを指定します。イベント画面は「候補を解析」→対象にチェック・名前を編集→「選択した箇所をプレビュー」の順に使います。条件式と前後のソース、付与後のソース、診断を確認できます。
+WPF はメイン画面から機能を選び、ソースフォルダーを指定して「解析・プレビュー」を実行します。検索して変更案を確認し、一覧のチェックで適用対象を選びます。初期選択は0件です。両画面で変更行を緑色と「+」で示し、前後の変更箇所へ移動できます。CPUはファイル単位、イベントは候補単位で選択します。
 
-CPU はループ・対象API・複数の処理呼び出しを根拠に候補を絞ります。「全関数（互換）」または `cpu <path> --all-functions` で従来の対象に戻せます。イベント画面の「数量 ADD（任意）」では回数とは別の数量を、値・単位・意味を確認して追加できます。[Engine 調査・使い方・実験結果](wiki/tracing/focused-cpu-and-quantity-counters.md)を参照してください。
+イベントの「名前・数量ADD」には値引数の型と名前から推奨を表示します。意味と単位が未確認の数量は適用できません。[画面操作・インデント・推奨の条件と限界](wiki/tracing/preview-selection-and-indentation.md)を参照してください。
+
+CPU はループ・対象API・複数の処理呼び出しを根拠に候補を絞ります。「全関数（互換）」または `cpu <path> --all-functions` で従来の対象に戻せます。イベント画面の「名前・数量ADD」では回数とは別の数量を、値・単位・意味を確認して追加できます。[Engine 調査・使い方・実験結果](wiki/tracing/focused-cpu-and-quantity-counters.md)を参照してください。
 
 ソースパス欄はフォルダーを 1 つドロップして指定できます。入力したパス・絞り込み・編集したカウンター名は次回起動時にも復元します。候補の選択や適用待ちの変更案は復元しません。[保存内容と保存先](wiki/input-assistance.md)も参照してください。
 

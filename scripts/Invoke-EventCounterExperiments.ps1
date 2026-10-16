@@ -39,6 +39,7 @@ foreach ($target in @(@{Name='lyra';Root=$LyraSource}, @{Name='blockbreaker';Roo
     $summary = [pscustomobject]@{
         Target=$target.Name; Files=$plan.Files.Count; Candidates=$candidates.Count; AddedEvents=$plan.AddedEventCounters
         ChangedFiles=$plan.ChangedFiles; Diagnostics=$plan.DiagnosticCount
+        QuantityRecommendations=@($candidates | Where-Object { $null -ne $_.RecommendedQuantity }).Count
         SecondPassCandidates=$secondCandidates.Count; OriginalFiles=$before.Count; OriginalChanges=0
     }
     $summary | ConvertTo-Json | Set-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8

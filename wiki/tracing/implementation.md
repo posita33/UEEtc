@@ -6,6 +6,8 @@ status: todo
 
 # Trace マクロ付与ツールの設計と使い方
 
+最新の画面操作と適用選択は [Issue #23〜#25 の更新](preview-selection-and-indentation.md) を参照してください。
+
 このページの画面・ディレクトリ構成は Issue #7 までの記録です。Issue #10 で CPU とイベントカウンターを別画面に分け、名前空間・ファイル配置も整理しました。[現行の構成と操作手順](event-counters.md)を参照してください。以下の進入回数モードは Console の互換機能として残しています。
 
 [目次](../README.md) / [調査](engine-research.md) / [実験](experiments-2026-10-16.md)

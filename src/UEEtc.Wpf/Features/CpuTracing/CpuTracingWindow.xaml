@@ -4,11 +4,13 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UEEtc.Wpf"
+        xmlns:preview="clr-namespace:UEEtc.Wpf.Preview"
         mc:Ignorable="d"
         Title="UEEtc - CPU スコープ" Height="800" Width="1240"
         MinHeight="620" MinWidth="920">
     <Grid Margin="20" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -33,24 +35,34 @@
             <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Export_Click" />
             <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" Click="Apply_Click" />
         </WrapPanel>
-        <Grid Grid.Row="3">
+        <DockPanel Grid.Row="3" Margin="0,0,0,8">
+            <TextBlock Text="検索" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button x:Name="SelectVisibleButton" Content="表示中を選択" Click="SelectVisible_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearVisibleButton" Content="表示中を解除" Click="ClearVisible_Click" Padding="8,4" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数名・判定理由を検索。フィルターで隠れた選択も適用対象です。" />
+        </DockPanel>
+        <Grid Grid.Row="4">
             <Grid.ColumnDefinitions><ColumnDefinition Width="360" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-            <DataGrid x:Name="FileList" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Single"
                       SelectionChanged="FileList_SelectionChanged" CanUserAddRows="False" EnableRowVirtualization="True">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" Width="*" MinWidth="250">
+                    <DataGridTemplateColumn Header="適用" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                        <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding File.HasChanges}" HorizontalAlignment="Center" />
+                    </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" IsReadOnly="True" Width="*" MinWidth="200">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock"><Setter Property="ToolTip" Value="{Binding RelativePath}" /></Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Header="付与" Binding="{Binding AddedFunctions}" Width="45" />
+                    <DataGridTextColumn Header="付与" Binding="{Binding AddedFunctions}" IsReadOnly="True" Width="45" />
                 </DataGrid.Columns>
             </DataGrid>
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" />
             <TabControl Grid.Column="2">
                 <TabItem Header="付与後プレビュー">
-                    <TextBox x:Name="PreviewText" IsReadOnly="True" FontFamily="Consolas" FontSize="13"
-                             HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                    <preview:CodeChangePreview x:Name="PreviewText" />
                 </TabItem>
                 <TabItem Header="付与前">
                     <TextBox x:Name="OriginalText" IsReadOnly="True" FontFamily="Consolas" FontSize="13"
@@ -72,7 +84,7 @@
                 </TabItem>
             </TabControl>
         </Grid>
-        <StackPanel Grid.Row="4" Margin="0,12,0,0">
+        <StackPanel Grid.Row="5" Margin="0,12,0,0">
             <ProgressBar x:Name="Progress" Height="4" Visibility="Collapsed" IsIndeterminate="True" />
             <TextBlock x:Name="StatusText" Text="Source フォルダーを指定して解析してください。" Margin="0,8,0,0" TextWrapping="Wrap" />
         </StackPanel>
