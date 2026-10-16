@@ -10,6 +10,7 @@ status: todo
 
 2026-10-16時点の実装を、CPUスコープ付与とイベントカウンター付与の2機能に分けて整理する。
 両機能を1回の操作で実行する[統合画面（Issue #45）](combined-tracing.md)も利用できる。各機能の条件は以下と共通である。
+[Engine監査と責務分離（Issue #47）](engine-audit-and-refactoring.md)に、最新の構成とgotoの安全対策を記録している。
 Engineの調査対象は `C:/Program Files/Epic Games/UE_5.8/Engine`。以下のEngine参照パスはこのフォルダーからの相対パスで、行番号もこのインストールに対応する。
 他のUEバージョンではマクロ定義と利用例を確認し直す。
 
@@ -76,7 +77,7 @@ Super後に挿入する場合は、その後の領域に対して判定する。
 
 1. `Super::同じ関数名(...)`がなければ、本体の入口に置く。
 2. 関数直下の独立した無条件文として同名Superを1回だけ呼ぶ場合は、その直後に置く。Superより前の処理も計測から外れる。
-3. 同名Superが条件内・代入・return式・ラムダ内にある、複数回ある、関連する条件コンパイルがある場合は自動配置しない。
+3. 同名Superが条件内・代入・return式・ラムダ内にある、複数回ある、関連する条件コンパイルがある場合は自動配置しない。gotoで初期化を飛び越す可能性がある関数も、Super後への自動配置を行わない。
 4. Super後に処理が残っていなければ追加しない。
 
 [CpuScopeMacro](../../src/UEEtc.Core/Features/FunctionTracing/CpuScopeMacro.cs)は、通常「クラス名 関数名」の固定ラベルを作る。
@@ -107,7 +108,7 @@ UE 5.8では通常形とSTRは同じ静的IDの経路を通る。**STRは動的�
 
 ### 候補の検出
 
-[EventCounterService](../../src/UEEtc.Core/Features/EventCounters/EventCounterService.cs)が[CppStructure](../../src/UEEtc.Core/Source/CppStructure.cs)で識別できる通常の関数を調べ、非空の`if (...) { ... }` / `else { ... }`を候補にする。
+[EventCounterService](../../src/UEEtc.Core/Features/EventCounters/EventCounterService.cs)から呼ぶ[EventCandidateDiscovery](../../src/UEEtc.Core/Features/EventCounters/EventCandidateDiscovery.cs)が、[CppStructure](../../src/UEEtc.Core/Source/CppStructure.cs)で識別できる通常の関数を調べ、非空の`if (...) { ... }` / `else { ... }`を候補にする。
 ネストした通常分岐も調べる。ループ・switch・catch・ラムダ・ローカルクラス内は探索せず、波括弧なしの分岐は書き換えない。
 特殊な宣言、コルーチン、関数内のプリプロセッサー、条件コンパイル下の関数、constexpr分岐等は保守的に外す。
 分岐直下に既存の`TRACE_COUNTER_*`操作があれば、その分岐は候補から外す。既存CPUスコープだけでは除外しない。
@@ -147,6 +148,7 @@ ActiveScopesには`ON_SCOPE_EXIT`を使い、通常退出・return・例外で�
 Countを減らさず、独立した現在数を追加するため、累積回数を失わない。
 **直接バッチに別の現在数を付けるのはツールの独自方針**。Engineの非同期Inflightを字句解析だけで再現しているわけではない。
 バッチ内で非同期処理を開始しても、現在数が表すのは呼び出し側分岐のスコープだけである。
+gotoを含む関数では、初期化を飛び越す可能性があるため退出ガードを自動挿入せず、手動の現在数指定も拒否する。
 
 生成イメージ（`BatchProcessor.cpp`の分岐内）:
 
@@ -196,7 +198,7 @@ UEプロジェクト全体のビルド、実際の`.utrace`、Insightsでの効�
 | 変更したいこと | 共通Coreの入口 |
 | --- | --- |
 | CPUの候補・配置・マクロ | `Features/FunctionTracing/CppInstrumenter.cs`、`CpuScopeFocus.cs`、`CpuScopePlacement.cs`、`CpuScopeMacro.cs` |
-| イベントの候補・生成 | `Features/EventCounters/EventCounterService.cs` |
+| イベントの候補・検証・生成 | `Features/EventCounters/EventCandidateDiscovery.cs`、`EventSelectionValidator.cs`、`EventCounterPlanBuilder.cs`。`EventCounterService.cs`は組み立てと公開API |
 | 数量・直接バッチの推奨 | `Features/EventCounters/QuantityCounterSelection.cs`、`QuantityRecommendation.cs`、`EventCounterDefaults.cs` |
 | ファイル探索・適用 | `Source/SourceWorkspace.cs` |
 | 変更案・レポート・差分 | `Plans/AnalysisPlan.cs`、`Reporting/ReportExporter.cs`、`Reporting/ChangedLineMap.cs` |

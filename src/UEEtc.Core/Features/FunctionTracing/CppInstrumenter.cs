@@ -17,6 +17,9 @@ public sealed class CppInstrumenter
     }
 
     internal FileAnalysis AnalyzeUnresolved(string relativePath, byte[] bytes, InstrumentationOptions options)
+        => Propose(relativePath, bytes, options).Render();
+
+    internal FileProposal Propose(string relativePath, byte[] bytes, InstrumentationOptions options)
     {
         var functions = new List<FunctionAnalysis>();
         var diagnostics = new List<string>();
@@ -52,12 +55,11 @@ public sealed class CppInstrumenter
                 if (position > 0 && document.Text[position - 1] != '\n') declarations = newline + declarations;
                 edits.Add(new(position, declarations));
             }
-            string proposed = SourceInsertion.Apply(document.Text, edits);
-            return new(relativePath, functions, diagnostics)
+            return new(new(relativePath, functions, diagnostics)
             {
-                OriginalBytes = bytes, ProposedBytes = document.Encode(proposed),
-                OriginalText = document.Text, ProposedText = proposed, Insertions = edits
-            };
+                OriginalBytes = bytes, ProposedBytes = bytes,
+                OriginalText = document.Text, ProposedText = document.Text
+            }, document, edits);
 
             void Visit(int start, int end, string namespaceName)
             {
@@ -183,7 +185,7 @@ public sealed class CppInstrumenter
         catch (Exception exception) when (exception is InvalidDataException or DecoderFallbackException)
         {
             diagnostics.Add(exception.Message);
-            return new(relativePath, [], diagnostics) { OriginalBytes = bytes, ProposedBytes = bytes };
+            return new(new(relativePath, [], diagnostics) { OriginalBytes = bytes, ProposedBytes = bytes }, null, []);
         }
     }
 

@@ -6,62 +6,14 @@ using Microsoft.Win32;
 using UEEtc.Core.Features.EventCounters;
 using UEEtc.Core.Plans;
 using UEEtc.Core.Reporting;
-using UEEtc.Core.Source;
 using UEEtc.Wpf.InputAssistance;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Threading;
 using UEEtc.Wpf.Preview;
+using UEEtc.Wpf.Workflow;
 
 namespace UEEtc.Wpf.Features.EventCounters;
-
-public sealed class CandidateRow(EventCounterCandidate candidate, Action changed, Action<CandidateRow>? edited = null,
-    string? savedName = null, string? savedDisplay = null) : INotifyPropertyChanged
-{
-    public EventCounterCandidate Candidate { get; } = candidate;
-    private bool selected = true;
-    private bool trackActiveScopes;
-    private bool includeActiveScope = EventCounterDefaults.Create(candidate).IncludeActiveScope;
-    public bool IncludeActiveScope { get => includeActiveScope; set { includeActiveScope = value; if (value) TrackActiveScopes = false; Changed(nameof(IncludeActiveScope)); } }
-    public string AutomaticDecision => EventCounterDefaults.Explain(Candidate);
-    public string PlannedMacros => "INCREMENT" + (IncludeActiveScope || TrackActiveScopes ? " + DECREMENT（スコープ）" : "") + (QuantityEnabled ? " + ADD " + QuantityValue + " [" + QuantityUnit + "]" : "");
-    private bool changingMeasurement;
-    public bool TrackActiveScopes
-    {
-        get => trackActiveScopes;
-        set
-        {
-            if (trackActiveScopes == value) return;
-            if (value) IncludeActiveScope = false;
-            changingMeasurement = true;
-            string activeName = Candidate.SuggestedName.EndsWith("_Count", StringComparison.Ordinal) ? Candidate.SuggestedName[..^6] + "_ActiveScopes" : Candidate.SuggestedName + "_ActiveScopes";
-            if (CounterName == (value ? Candidate.SuggestedName : activeName)) CounterName = value ? activeName : Candidate.SuggestedName;
-            if (DisplayName == (value ? Candidate.DisplayName : Candidate.DisplayName + " ActiveScopes")) DisplayName = Candidate.DisplayName + (value ? " ActiveScopes" : "");
-            trackActiveScopes = value; changingMeasurement = false; Changed(nameof(TrackActiveScopes));
-        }
-    }
-    private string counterName = savedName ?? candidate.SuggestedName;
-    private string displayName = savedDisplay ?? candidate.DisplayName;
-    private bool quantityEnabled = candidate.RecommendedQuantity is not null, meaningConfirmed = candidate.RecommendedQuantity is not null;
-    private string quantityName = candidate.RecommendedQuantity?.CreateInputSelection(candidate).CounterName ?? candidate.SuggestedName + "Quantity",
-        quantityDisplay = candidate.RecommendedQuantity?.CreateInputSelection(candidate).DisplayName ?? candidate.DisplayName + " Quantity",
-        quantityValue = candidate.RecommendedQuantity?.Value ?? "", quantityUnit = candidate.RecommendedQuantity?.Unit ?? "";
-    public string Recommendation => Candidate.RecommendedQuantity is { } q ? $"{q.Value} [{q.Unit}] — {q.Reason}" : "推奨なし（値・単位を安全に推定できない、または候補が複数）";
-    public bool QuantityEnabled { get => quantityEnabled; set { quantityEnabled = value; Changed(nameof(QuantityEnabled)); } }
-    public bool MeaningConfirmed { get => meaningConfirmed; set { meaningConfirmed = value; Changed(nameof(MeaningConfirmed)); } }
-    public string QuantityName { get => quantityName; set { quantityName = value; Changed(nameof(QuantityName)); } }
-    public string QuantityDisplay { get => quantityDisplay; set { quantityDisplay = value; Changed(nameof(QuantityDisplay)); } }
-    public string QuantityValue { get => quantityValue; set { if (quantityValue == value) return; quantityValue = value; MeaningConfirmed = false; Changed(nameof(QuantityValue)); } }
-    public string QuantityUnit { get => quantityUnit; set { if (quantityUnit == value) return; quantityUnit = value; MeaningConfirmed = false; Changed(nameof(QuantityUnit)); } }
-    public bool Selected { get => selected; set { selected = value; Changed(nameof(Selected)); } }
-    public string CounterName { get => counterName; set { counterName = value; Changed(nameof(CounterName)); } }
-    public string DisplayName { get => displayName; set { displayName = value; Changed(nameof(DisplayName)); } }
-    public event PropertyChangedEventHandler? PropertyChanged;
-    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); PropertyChanged?.Invoke(this, new(nameof(PlannedMacros))); changed(); if (!changingMeasurement && name is nameof(CounterName) or nameof(DisplayName)) edited?.Invoke(this); }
-    public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName,
-        QuantityEnabled ? new(QuantityName, QuantityDisplay, QuantityValue, QuantityUnit, MeaningConfirmed) : null,
-        TrackActiveScopes ? CounterMeasurement.ActiveScope : CounterMeasurement.Cumulative, IncludeActiveScope);
-}
 
 public partial class EventCountersWindow : Window
 {
@@ -80,10 +32,12 @@ public partial class EventCountersWindow : Window
     public bool IsBusy => busy;
     public bool IsPreviewPending => previewTimer.IsEnabled || busy;
     private readonly RememberedInputs inputs;
+    private readonly PlanFileActions fileActions;
     public EventCountersWindow() : this(InputSettingsStore.Default) { }
     public EventCountersWindow(InputSettingsStore settings)
     {
         InitializeComponent();
+        fileActions = new(this, value => SetBusy(value), text => StatusText.Text = text, ShowError);
         SelectionActions.Attach(FileList);
         previewTimer.Tick += (_, _) => { previewTimer.Stop(); if (!busy && scan is not null) Preview_Click(this, new RoutedEventArgs()); };
         inputs = new(this, settings, text => StatusText.Text = text);
@@ -216,30 +170,14 @@ public partial class EventCountersWindow : Window
         catch (Exception error) { StatusText.Text = "プレビューを更新できません: " + error.Message; }
         finally { previewBuilding = false; SetBusy(false); if (version != revision) QueuePreview(); }
     }
-    private async void Export_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedPlan is not { ChangedFiles: > 0 } current) return;
-        var picker = new OpenFolderDialog { Title = "ソース外の空の出力フォルダー" };
-        if (picker.ShowDialog(this) != true) return;
-        SetBusy(true);
-        try { await Task.Run(() => ReportExporter.Export(current, picker.FolderName)); StatusText.Text = "保存しました: " + picker.FolderName; }
-        catch (Exception error) { ShowError(error); }
-        finally { SetBusy(false); }
-    }
-    private async void Apply_Click(object sender, RoutedEventArgs e)
-    {
-        if (plan is not { DiagnosticCount: 0, RequiresQuantityConfirmation: false } || SelectedPlan is not { ChangedFiles: > 0 } current) return;
-        if (MessageBox.Show(this, $"{current.RootPath}\n\n{current.ChangedFiles} ファイルに選択済みイベントカウンターを追加します。\nバックアップを作成して適用しますか？", "イベントカウンターの適用", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        SetBusy(true);
-        try
+    private async void Export_Click(object sender, RoutedEventArgs e) => await fileActions.ExportAsync(SelectedPlan);
+    private async void Apply_Click(object sender, RoutedEventArgs e) =>
+        await fileActions.ApplyAsync(plan, SelectedPlan, "イベントカウンター", applied =>
         {
-            string backup = await Task.Run(() => new SourceWorkspace().Apply(current));
+            plan = null;
+            if (!applied) return;
             scan = null; rows = []; files = []; FileList.ItemsSource = CandidateList.ItemsSource = null;
-            StatusText.Text = "適用しました。再解析してください。バックアップ: " + backup;
-        }
-        catch (Exception error) { ShowError(error); }
-        finally { plan = null; SetBusy(false); }
-    }
+        });
     private void Cancel_Click(object sender, RoutedEventArgs e) => cancellation?.Cancel();
     private void SetBusy(bool value)
     {
@@ -248,13 +186,9 @@ public partial class EventCountersWindow : Window
         SelectAllButton.IsEnabled = ClearAllButton.IsEnabled = SelectRowsButton.IsEnabled = ClearRowsButton.IsEnabled = !value;
         PreviewButton.IsEnabled = !value && scan is not null;
         FileList.IsEnabled = CandidateList.IsEnabled = QuantityEditor.IsEnabled = scan is not null && (!value || previewBuilding);
-        ExportButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 };
-        ApplyButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 } && plan is { DiagnosticCount: 0, RequiresQuantityConfirmation: false };
-        ApplyButton.ToolTip = value ? "解析・プレビューの完了を待ってください。" : plan is null ? "解析・プレビューを実行し、入力エラーがあれば修正してください。" :
-            plan.DiagnosticCount > 0 ? "診断の内容を解消してから再解析してください。" :
-            plan.RequiresQuantityConfirmation ? "詳細設定で数量ADDの意味・単位を確認するか、ADDを無効にしてください。" :
-            SelectedPlan is not { ChangedFiles: > 0 } ? "変更候補のあるファイルを一覧でチェックしてください。" :
-            $"選択した {SelectedPlan.ChangedFiles} ファイルに、確認後バックアップを作成して適用します。";
+        var availability = PlanAvailability.For(plan, SelectedPlan, value);
+        ExportButton.IsEnabled = availability.CanExport;
+        ApplyButton.IsEnabled = availability.CanApply; ApplyButton.ToolTip = availability.ApplyHint;
         CancelButton.IsEnabled = value && cancellation is not null;
         Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }

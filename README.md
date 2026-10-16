@@ -20,6 +20,7 @@ CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とST
 [調査・設計・実験結果の目次](wiki/README.md)
 
 [現行2機能の付与ロジックとEngine参照](wiki/tracing/current-feature-logic.md)、[追加Trace機能の候補と優先度](wiki/tracing/trace-feature-candidates.md)に、実装根拠と今後の検討内容をまとめています。
+[Engineとの整合性監査と責務分離](wiki/tracing/engine-audit-and-refactoring.md)には、マクロの照合結果、gotoの安全対策、Core/WPFの構成を記録しています。
 
 ## 開発環境
 
@@ -114,6 +115,8 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 ./scripts/Test-CpuScopePolicy.ps1 -CpuMacro str
 ./scripts/Test-ScopedEventCounters.ps1
 ./scripts/Test-CombinedTracing.ps1
+./scripts/Test-CombinedTracing.ps1 -EngineMacroDefinitions
+./scripts/Test-GotoInstrumentation.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1

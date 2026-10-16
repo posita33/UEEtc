@@ -20,6 +20,8 @@ internal sealed record CpuScopePlacement(int? Position, string Decision)
             else if (tokens[i].Text is "}" or ")" or "]") depth--;
         }
         if (calls.Count == 0) return new(tokens[open].End, "追加：関数全体の時間");
+        if (tokens.Skip(open + 1).Take(close - open - 1).Any(t => !t.Literal && t.Text == "goto"))
+            return new(null, "gotoを含む関数は同名Super後のスコープ初期化を飛び越す可能性があるため手動確認");
         const string manual = "同名の Super 呼び出しの後に安全な計測位置を確定できないため手動確認";
         if (calls.Count != 1 || !calls[0].TopLevel ||
             scanned.Any(t => t.Directive && t.Start > tokens[open].Start && t.Start < tokens[close].End))

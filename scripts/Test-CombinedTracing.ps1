@@ -1,4 +1,4 @@
-param([string]$EngineRoot = 'C:/Program Files/Epic Games/UE_5.8/Engine')
+param([string]$EngineRoot = 'C:/Program Files/Epic Games/UE_5.8/Engine', [switch]$EngineMacroDefinitions)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/combined-cpp/' + [guid]::NewGuid().ToString('N'))
@@ -74,7 +74,7 @@ int main() {
 #if TEST_COUNTER_ENABLED
 struct Counter {
     bool Scope;
-    explicit Counter(const wchar_t* name) : Scope(std::wcsstr(name, L"ActiveScopes") != nullptr) {}
+    explicit Counter(const wchar_t* name, int = 0) : Scope(std::wcsstr(name, L"ActiveScopes") != nullptr) {}
     void Increment() { if (!Scope) { ++Calls; return; } int current = ++Current; int peak = Peak.load(); while (current > peak && !Peak.compare_exchange_weak(peak, current)) {} }
     void Decrement() { --Current; }
     void Add(int amount) { Quantity += amount; }
@@ -90,6 +90,52 @@ struct Counter {
 #define TRACE_COUNTER_ADD(Name, Value)
 #endif
 '@ | Set-Content (Join-Path $stubs 'ProfilingDebugging/CountersTrace.h') -Encoding utf8
+if ($EngineMacroDefinitions) {
+    # Use the installed Engine's public macro bodies. Only the trace-output backend is a fixture.
+    function MacroDefinitions([string]$Header, [string[]]$Names, [bool]$Enabled) {
+        $lines = [IO.File]::ReadAllLines($Header)
+        foreach ($name in $Names) {
+            $matches = @(for ($i=0; $i -lt $lines.Length; $i++) { if ($lines[$i] -match ('^#define\s+' + [regex]::Escape($name) + '\(')) { $i } })
+            if (!$matches.Count) { throw "Engine macro not found: $name" }
+            $index = if ($Enabled) { $matches[0] } else { $matches[-1] }
+            do { $line = $lines[$index++]; $line } while ($line.TrimEnd().EndsWith('\'))
+        }
+    }
+    $commonPrelude = @'
+#pragma once
+#include <cstdint>
+#include <type_traits>
+#define UE_JOIN_IMPL(a,b) a##b
+#define UE_JOIN(a,b) UE_JOIN_IMPL(a,b)
+using uint32 = uint32_t;
+'@
+    $cpuHeader = Join-Path $EngineRoot 'Source/Runtime/Core/Public/ProfilingDebugging/CpuProfilerTrace.h'
+    $cpuNames = @('TRACE_CPUPROFILER_EVENT_DECLARE','TRACE_CPUPROFILER_EVENT_SCOPE_USE','TRACE_CPUPROFILER_EVENT_SCOPE_STR_CONDITIONAL','TRACE_CPUPROFILER_EVENT_SCOPE_STR','TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL','TRACE_CPUPROFILER_EVENT_SCOPE')
+    $cpuBackend = @'
+struct FCpuProfilerTrace {
+    struct FEventScope : CpuScope {
+        FEventScope(uint32& id, const char* name, bool enabled, const char*, uint32) : CpuScope(name) { id=1; if (!enabled) ++Errors; }
+    };
+};
+'@
+    @($commonPrelude,'#if TEST_CPU_ENABLED',$cpuBackend,(MacroDefinitions $cpuHeader $cpuNames $true),'#else',(MacroDefinitions $cpuHeader $cpuNames $false),'#endif') |
+        Set-Content (Join-Path $stubs 'ProfilingDebugging/CpuProfilerTrace.h') -Encoding utf8
+    $counterHeader = Join-Path $EngineRoot 'Source/Runtime/Core/Public/ProfilingDebugging/CountersTrace.h'
+    $counterStub = [IO.File]::ReadAllText((Join-Path $stubs 'ProfilingDebugging/CountersTrace.h'))
+    $counterBackend = $counterStub.Substring(0, $counterStub.IndexOf('#define TRACE_DECLARE_ATOMIC_INT_COUNTER'))
+    $counterTypes = @'
+constexpr int TraceCounterDisplayHint_None = 0;
+struct FCountersTrace { using FCounterAtomicInt = Counter; };
+template<class T> struct TIsCharEncodingCompatibleWithTCHAR { static constexpr bool Value = std::is_same_v<T,wchar_t>; };
+template<class Array, template<class> class Predicate> struct TIsArrayOrRefOfTypeByPredicate {
+    using BareArray = std::remove_reference_t<Array>;
+    static constexpr bool Value = std::is_array_v<BareArray> && Predicate<std::remove_cv_t<std::remove_extent_t<BareArray>>>::Value;
+};
+'@
+    $counterNames = @('TRACE_DECLARE_COUNTER','TRACE_DECLARE_ATOMIC_INT_COUNTER','TRACE_COUNTER_INCREMENT','TRACE_COUNTER_DECREMENT','TRACE_COUNTER_ADD')
+    @($commonPrelude,$counterBackend,$counterTypes,(MacroDefinitions $counterHeader @('__TRACE_CHECK_COUNTER_NAME') $true),(MacroDefinitions $counterHeader $counterNames $true),'#else',(MacroDefinitions $counterHeader $counterNames $false),'#endif') |
+        Set-Content (Join-Path $stubs 'ProfilingDebugging/CountersTrace.h') -Encoding utf8
+}
 $cli = Join-Path $repoRoot 'src/UEEtc.Console/bin/Release/net10.0/UEEtc.Console.dll'
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vsPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
