@@ -17,7 +17,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="Unreal Engine Trace マクロ付与" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="フォルダー配下の .cpp を再帰解析します。解析・レポート保存では元のソースを書き換えません。"
+            <TextBlock Text="標準は CPU の時間計測のみ。進入回数は必要な場合に選択できます（成功・命中数は自動推定しません）。解析・保存では元ソースを変更しません。"
                        Margin="0,8,0,12" TextWrapping="Wrap" />
         </StackPanel>
         <Grid Grid.Row="1" Margin="0,0,0,10">
@@ -27,8 +27,8 @@
             <Button x:Name="BrowseButton" Grid.Column="1" Content="フォルダーを選択…" Padding="12,6" Margin="8,0,0,0" Click="Browse_Click" />
         </Grid>
         <WrapPanel Grid.Row="2" Margin="0,0,0,12">
-            <CheckBox x:Name="CpuOption" Content="CPU スコープ" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="InputsChanged" />
-            <CheckBox x:Name="CounterOption" Content="関数進入回数" IsChecked="True" VerticalAlignment="Center" Margin="0,0,20,0" Click="InputsChanged" />
+            <CheckBox x:Name="CpuOption" Content="CPU スコープ（時間）" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="InputsChanged" />
+            <CheckBox x:Name="CounterOption" Content="関数進入回数（任意）" IsChecked="False" VerticalAlignment="Center" Margin="0,0,20,0" Click="InputsChanged" />
             <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Padding="14,7" Margin="0,0,8,0" Click="Analyze_Click" />
             <Button x:Name="CancelButton" Content="中止" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Cancel_Click" />
             <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Export_Click" />
@@ -63,7 +63,9 @@
                             <DataGridTextColumn Header="行" Binding="{Binding Line}" Width="50" />
                             <DataGridTextColumn Header="判定" Binding="{Binding Status}" Width="55" />
                             <DataGridTextColumn Header="関数" Binding="{Binding Name}" Width="200" />
-                            <DataGridTextColumn Header="理由" Binding="{Binding Reason}" Width="*" />
+                            <DataGridTextColumn Header="CPU" Binding="{Binding CpuDecision}" Width="150" />
+                            <DataGridTextColumn Header="カウンター" Binding="{Binding CounterDecision}" Width="220" />
+                            <DataGridTextColumn Header="理由" Binding="{Binding Reason}" Width="*" MinWidth="160" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </TabItem>

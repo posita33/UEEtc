@@ -25,7 +25,7 @@ public sealed class InstrumentationService
         var instrumenter = new CppInstrumenter();
         Walk(root);
         cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report("カウンター名の衝突を確認中");
+        if (options.CallCounters) progress?.Report("カウンター名の衝突を確認中");
         return new(root, options, CounterNaming.Resolve(files, reservedNames, cancellationToken), diagnostics);
 
         void Walk(string directory)

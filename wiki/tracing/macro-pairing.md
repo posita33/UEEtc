@@ -85,7 +85,9 @@ CPU スコープは区間の経過時間、カウンターは定義した計測�
 
 `COUNTERSTRACE_ENABLED` が有効なビルドでは、Counters チャンネルがオフでも `Increment()` 内の値は更新されます。チャンネルが制御するのはその値のトレース出力です。CPU scope 側の記録は Cpu チャンネルによって制御されます。二つのレコードが必ず同数・同時に出る保証はありません。
 
-## UEEtc で両方が生成される条件
+## 調査時点の UEEtc で両方が生成される条件
+
+以下は Issue #5 の調査時点の動作です。その後、[Issue #7 の実装](independent-trace-policy.md)で、標準を CPU のみとし、既存計測の判定も種類ごとに独立させました。
 
 `src/UEEtc.Core/AnalysisPlan.cs` の `InstrumentationOptions` は、初期値が `CpuScopes = true`、`CallCounters = true` です。WPF の二つのチェックも初期状態でオン、Console も引数で片方を指定しなければ両方オンです。
 

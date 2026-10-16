@@ -44,11 +44,13 @@ var tests = new (string Name, Action Run)[]
         Equal(0, file.AddedFunctions);
         Assert(file.Functions.Count >= 3);
     }),
-    ("Existing macros in code are skipped, macros in comments are ignored", () =>
+    ("Existing CPU macros suppress CPU only, comments are ignored", () =>
     {
         var file = Analyze("void F::A() { TRACE_CPUPROFILER_EVENT_SCOPE(A); Run(); }\nvoid F::B() { QUICK_SCOPE_CYCLE_COUNTER(B); Run(); }\nvoid F::C() { /* TRACE_COUNTER_INCREMENT(C); */ Run(); }");
-        Equal(1, file.AddedFunctions);
-        Equal("F::C", file.Functions.Single(f => f.Status == "Add").Name);
+        Equal(3, file.AddedFunctions);
+        Equal(1, file.AddedCpuScopes);
+        Equal(3, file.AddedCallCounters);
+        Equal("F::C", file.Functions.Single(f => f.CpuScopeAdded).Name);
     }),
     ("Overloads and namespace names have different counter IDs", () =>
     {
@@ -69,8 +71,8 @@ var tests = new (string Name, Action Run)[]
     {
         const string body = "#include \"Fixture.h\"\nvoid F::_Work_Impl() { Run(); }";
         var instrumenter = new CppInstrumenter();
-        var first = instrumenter.Analyze("ModuleA/Fixture.cpp", Encoding.UTF8.GetBytes(body), new());
-        var second = instrumenter.Analyze("ModuleB/Fixture.cpp", Encoding.UTF8.GetBytes(body), new());
+        var first = instrumenter.Analyze("ModuleA/Fixture.cpp", Encoding.UTF8.GetBytes(body), new(true, true));
+        var second = instrumenter.Analyze("ModuleB/Fixture.cpp", Encoding.UTF8.GetBytes(body), new(true, true));
         string name = first.Functions.Single().Counter!;
         Equal("F_Work_Impl_CallCount", name);
         Assert(!name.Contains("__", StringComparison.Ordinal));
@@ -103,8 +105,8 @@ var tests = new (string Name, Action Run)[]
         Write(root, "B.cpp", "#include \"Fixture.h\"\nvoid A::B_Work() { Run(); }");
         Write(root, "A.cpp", "#include \"Fixture.h\"\nvoid A_B::Work() { Run(); }");
         var service = new InstrumentationService();
-        var first = service.Analyze(root);
-        var second = service.Analyze(root);
+        var first = service.Analyze(root, new(true, true));
+        var second = service.Analyze(root, new(true, true));
         var counters = first.Files.SelectMany(f => f.Functions).Select(f => f.Counter).ToArray();
         Equal(2, counters.Distinct().Count());
         Assert(counters.All(c => c!.StartsWith("A_B_Work_CallCount_", StringComparison.Ordinal)));
@@ -117,25 +119,27 @@ var tests = new (string Name, Action Run)[]
     {
         Write(root, "Work.cpp", "#include \"Fixture.h\"\nvoid F::Work() { Run(); }\nvoid F::Other() { Run(); }");
         Write(root, "Fixture.h", "TRACE_DECLARE_ATOMIC_INT_COUNTER(F_Work_CallCount, TEXT(\"Existing\"));\nint __GTraceCounterF_Other_CallCount;");
-        var plan = new InstrumentationService().Analyze(root);
+        var plan = new InstrumentationService().Analyze(root, new(true, true));
         Assert(plan.Files.Single().Functions.All(f => f.Counter!.Contains("_CallCount_", StringComparison.Ordinal)));
         Contains(File.ReadAllText(Path.Combine(root, "Fixture.h")), "F_Work_CallCount,");
     })),
     ("Reserved fallback names receive a further deterministic suffix", () => WithTemporaryRoot(root =>
     {
         const string source = "#include \"Fixture.h\"\nvoid Work(int a) { Run(); }\nvoid Work(float a) { Run(); }";
-        var original = new CppInstrumenter().Analyze("Work.cpp", Encoding.UTF8.GetBytes(source), new());
+        var original = new CppInstrumenter().Analyze("Work.cpp", Encoding.UTF8.GetBytes(source), new(true, true));
         string reserved = original.Functions[0].Counter!;
         Write(root, "Work.cpp", source);
         Write(root, "Fixture.hpp", "int __GTraceCounter" + reserved + ";");
-        var plan = new InstrumentationService().Analyze(root);
+        var plan = new InstrumentationService().Analyze(root, new(true, true));
         Equal(reserved + "_2", plan.Files.Single().Functions[0].Counter);
     })),
     ("Intentional repeated increments preserve one existing shared counter", () =>
     {
         const string body = "TRACE_DECLARE_ATOMIC_INT_COUNTER(SharedHits, TEXT(\"Hits\"));\nvoid One() { TRACE_COUNTER_INCREMENT(SharedHits); }\nvoid Two() { TRACE_COUNTER_INCREMENT(SharedHits); }\nvoid NewWork() { Run(); }";
         var file = Analyze(body);
-        Equal(1, file.AddedFunctions);
+        Equal(3, file.AddedFunctions);
+        Equal(3, file.AddedCpuScopes);
+        Equal(1, file.AddedCallCounters);
         Equal(2, Occurrences(file.ProposedText, "TRACE_COUNTER_INCREMENT(SharedHits)"));
         Equal(1, Occurrences(file.ProposedText, "TRACE_DECLARE_ATOMIC_INT_COUNTER(SharedHits,"));
         Contains(file.ProposedText, "TRACE_COUNTER_INCREMENT(NewWork_CallCount)");
@@ -181,14 +185,81 @@ var tests = new (string Name, Action Run)[]
             Assert(!file.HasChanges && file.Diagnostics.Count == 1);
         }
     }),
+    ("Default options produce CPU only without counter dependencies", () =>
+    {
+        var file = new CppInstrumenter().Analyze("Fixture.cpp", Encoding.UTF8.GetBytes(Fixture()), new());
+        Equal(1, file.AddedCpuScopes);
+        Equal(0, file.AddedCallCounters);
+        Assert(!file.ProposedText.Contains("CountersTrace.h") && !file.ProposedText.Contains("TRACE_DECLARE_") && !file.ProposedText.Contains("TRACE_COUNTER_"));
+        Equal("未選択", file.Functions.Single().CounterDecision);
+    }),
+    ("Existing CPU instrumentation allows an explicitly requested counter", () =>
+    {
+        var file = Analyze("void F::Work() { TRACE_CPUPROFILER_EVENT_SCOPE(Work); Run(); }");
+        Equal(0, file.AddedCpuScopes);
+        Equal(1, file.AddedCallCounters);
+        Equal(0, Occurrences(file.ProposedText, "CpuProfilerTrace.h"));
+        Equal(1, Occurrences(file.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE(Work)"));
+        Equal("F_Work_CallCount", file.Functions.Single().Counter);
+        Assert(file.Functions.Single().CpuDecision.Contains("既存"));
+    }),
+    ("Existing event counter allows CPU time without inferring counter meaning", () =>
+    {
+        var file = Analyze("void F::Work() { if (Hit) { TRACE_COUNTER_INCREMENT(CacheHits); } Run(); }");
+        Equal(1, file.AddedCpuScopes);
+        Equal(0, file.AddedCallCounters);
+        Contains(file.Functions.Single().CounterDecision, "自動推定しない");
+        Assert(!file.ProposedText.Contains("TRACE_DECLARE_") && !file.ProposedText.Contains("CountersTrace.h"));
+        Equal(1, Occurrences(file.ProposedText, "TRACE_COUNTER_INCREMENT(CacheHits)"));
+    }),
+    ("Both kinds existing are preserved without changes", () =>
+    {
+        var file = Analyze("void Work() { TRACE_CPUPROFILER_EVENT_SCOPE(Work); TRACE_COUNTER_INCREMENT(Calls); Run(); }");
+        Assert(!file.HasChanges);
+        Equal(0, file.AddedFunctions);
+        Assert(file.Functions.Single().CpuDecision.Contains("既存") && file.Functions.Single().CounterDecision.Contains("既存"));
+    }),
+    ("CPU-first then both adds only the counter and remains idempotent", () =>
+    {
+        var instrumenter = new CppInstrumenter();
+        var cpu = instrumenter.Analyze("Fixture.cpp", Encoding.UTF8.GetBytes(Fixture()), new());
+        var both = instrumenter.Analyze("Fixture.cpp", cpu.ProposedBytes, new(true, true));
+        Equal(0, both.AddedCpuScopes);
+        Equal(1, both.AddedCallCounters);
+        Equal(1, Occurrences(both.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE_STR("));
+        Equal(1, Occurrences(both.ProposedText, "TRACE_COUNTER_INCREMENT("));
+        Assert(!instrumenter.Analyze("Fixture.cpp", both.ProposedBytes, new(true, true)).HasChanges);
+    }),
+    ("Counter-first then both adds only CPU and remains idempotent", () =>
+    {
+        var instrumenter = new CppInstrumenter();
+        var counter = instrumenter.Analyze("Fixture.cpp", Encoding.UTF8.GetBytes(Fixture()), new(false, true));
+        var both = instrumenter.Analyze("Fixture.cpp", counter.ProposedBytes, new(true, true));
+        Equal(1, both.AddedCpuScopes);
+        Equal(0, both.AddedCallCounters);
+        Equal(1, Occurrences(both.ProposedText, "TRACE_DECLARE_ATOMIC_INT_COUNTER("));
+        Equal(1, Occurrences(both.ProposedText, "TRACE_COUNTER_INCREMENT("));
+        Assert(!instrumenter.Analyze("Fixture.cpp", both.ProposedBytes, new(true, true)).HasChanges);
+    }),
+    ("Unselected missing kind does not create an automatic pair", () =>
+    {
+        var cpu = Analyze("void Work() { TRACE_CPUPROFILER_EVENT_SCOPE(Work); Run(); }", new(true, false));
+        var counter = Analyze("void Work() { TRACE_COUNTER_INCREMENT(Hits); Run(); }", new(false, true));
+        Assert(!cpu.HasChanges && !counter.HasChanges);
+    }),
     ("CPU only and counter only", () =>
     {
         var cpu = Analyze("void Work() { Run(); }", new(true, false));
         Contains(cpu.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE_STR");
         Assert(!cpu.ProposedText.Contains("TRACE_COUNTER_INCREMENT"));
+        Equal(1, cpu.AddedCpuScopes);
+        Equal(0, cpu.AddedCallCounters);
         var counter = Analyze("void Work() { Run(); }", new(false, true));
         Contains(counter.ProposedText, "TRACE_COUNTER_INCREMENT");
         Assert(!counter.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR"));
+        Assert(!counter.ProposedText.Contains("CpuProfilerTrace.h"));
+        Equal(0, counter.AddedCpuScopes);
+        Equal(1, counter.AddedCallCounters);
     }),
     ("Existing includes do not get duplicated", () =>
     {
@@ -318,7 +389,7 @@ return failures == 0 ? 0 : 1;
 
 static string Fixture() => "#include \"Fixture.h\"\nvoid Work() { Run(); }\n";
 static FileAnalysis Analyze(string body, InstrumentationOptions? options = null) =>
-    new CppInstrumenter().Analyze("Module/Fixture.cpp", Encoding.UTF8.GetBytes("#include \"Fixture.h\"\n" + body), options ?? new());
+    new CppInstrumenter().Analyze("Module/Fixture.cpp", Encoding.UTF8.GetBytes("#include \"Fixture.h\"\n" + body), options ?? new(true, true));
 static void Assert(bool value) { if (!value) throw new Exception("Assertion failed"); }
 static void Equal<T>(T expected, T actual) { if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new Exception($"Expected {expected}; actual {actual}"); }
 static void Contains(string value, string part) => Assert(value.Contains(part, StringComparison.Ordinal));

@@ -65,7 +65,8 @@ internal static class CounterNaming
                 Functions = file.Functions.Select(f => f.Counter is null ? f : f with
                 {
                     Counter = assignments[f.CounterIdentity!].Name,
-                    Reason = f.Reason + (assignments[f.CounterIdentity!].Collision ? "（カウンター名の衝突を避けるためハッシュを付加）" : "")
+                    Reason = f.Reason + (assignments[f.CounterIdentity!].Collision ? "（カウンター名の衝突を避けるためハッシュを付加）" : ""),
+                    CounterDecision = f.CounterDecision + (assignments[f.CounterIdentity!].Collision ? "（衝突回避名）" : "")
                 }).ToArray()
             };
         }
