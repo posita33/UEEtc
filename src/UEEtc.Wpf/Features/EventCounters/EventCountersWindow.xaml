@@ -58,8 +58,8 @@
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" />
             <TabControl Grid.Column="2">
                 <TabItem Header="付与後プレビュー">
-                    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" MaxHeight="160" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PreviewSummary" TextWrapping="Wrap" Margin="8" /></ScrollViewer>
+                    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <ScrollViewer x:Name="PreviewSummaryScroll" MaxHeight="160" VerticalAlignment="Top" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PreviewSummary" TextWrapping="Wrap" Margin="8" /></ScrollViewer>
                         <preview:CodeChangePreview x:Name="PreviewText" Grid.Row="1" />
                     </Grid>
                 </TabItem>
