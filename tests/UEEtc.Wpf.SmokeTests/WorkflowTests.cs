@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Threading;
+using System.Windows.Input;
 using UEEtc.Core.Source;
 using UEEtc.Wpf.Features.CpuTracing;
 using UEEtc.Wpf.Features.EventCounters;
@@ -35,6 +36,13 @@ internal static class WorkflowTests
             check(cpu.SelectedPlan?.Files.Single().RelativePath == "Alpha.cpp", "Hidden selection remains explicit apply target");
             Click(cpu, "ClearVisibleButton"); check(files.Single(f => f.RelativePath == "Alpha.cpp").Selected, "Clear visible does not clear hidden file");
             filter.Text = ""; list.SelectedItem = files[0];
+            Click(cpu, "SelectAllButton"); check(files.All(f => f.Selected), "CPU global select includes all rows");
+            filter.Text = "Beta"; Click(cpu, "ClearAllButton"); check(files.All(f => !f.Selected), "Global clear includes hidden rows");
+            filter.Text = ""; list.SelectedItems.Clear(); list.SelectedItems.Add(files[0]); list.SelectedItems.Add(files[1]);
+            Click(cpu, "SelectRowsButton"); check(files.All(f => f.Selected), "Select highlighted CPU rows");
+            Space(cpu, list); check(files.All(f => !f.Selected), "Space toggles highlighted CPU rows");
+            Click(cpu, "SelectRowsButton"); Click(cpu, "ClearRowsButton"); check(files.All(f => !f.Selected), "Clear highlighted CPU rows");
+            files[0].Selected = true; list.SelectedItem = files[0];
             var preview = (CodeChangePreview)cpu.FindName("PreviewText");
             check(preview.ChangedLines.Count > 0 && preview.ChangeCount >= 2, "CPU preview distinguishes include and body changes");
             ((Button)preview.FindName("NextButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -57,8 +65,12 @@ internal static class WorkflowTests
             var row = ((IEnumerable<CandidateRow>)grid.ItemsSource).Single();
             var eventPreview = (CodeChangePreview)events.FindName("PreviewText");
             check(eventPreview.Text.Contains("TRACE_COUNTER_ADD("), "Analyze automatically previews recommended ADD");
-            check(row.QuantityEnabled && !row.MeaningConfirmed && row.QuantityValue == "NumBytes" && row.QuantityUnit == "bytes", "Recommendation sets provisional value and unit");
-            row.Selected = true; Until(() => !events.IsPreviewPending);
+            check(row.QuantityEnabled && row.MeaningConfirmed && row.QuantityValue == "NumBytes" && row.QuantityUnit == "bytes", "Recommendation automatically counts input quantity");
+            var eventList = (DataGrid)events.FindName("FileList");
+            var eventFile = ((IEnumerable<EventFileRow>)eventList.ItemsSource).Single(f => f.CanSelect);
+            eventFile.Selected = true; Until(() => !events.IsPreviewPending);
+            check(((Button)events.FindName("ApplyButton")).IsEnabled, "Automatic input quantity is ready with file selection");
+            row.MeaningConfirmed = false; Until(() => !events.IsPreviewPending);
             check(!((Button)events.FindName("ApplyButton")).IsEnabled, "Unconfirmed recommendation cannot be applied");
             row.MeaningConfirmed = true; Until(() => !events.IsPreviewPending);
             check(((Button)events.FindName("ApplyButton")).IsEnabled, "Confirmed selected recommendation enables apply");
@@ -70,11 +82,24 @@ internal static class WorkflowTests
             check(!row.MeaningConfirmed && !((Button)events.FindName("ApplyButton")).IsEnabled, "Editing quantity requires renewed confirmation");
             check(File.ReadAllText(Path.Combine(source, "Beta.cpp")) == b, "Event preview preserves source");
             Click(events, "ClearVisibleButton"); Until(() => !events.IsPreviewPending);
-            check(!row.Selected && !((Button)events.FindName("ApplyButton")).IsEnabled, "Clear visible disables apply while retaining reference preview");
+            check(!eventFile.Selected && !((Button)events.FindName("ApplyButton")).IsEnabled, "Clear visible disables file apply while retaining reference preview");
+            row.QuantityEnabled = false; Until(() => !events.IsPreviewPending);
+            Click(events, "SelectAllButton"); Until(() => !events.IsPreviewPending);
+            check(eventFile.Selected && events.SelectedPlan?.ChangedFiles == 1, "Global file selection skips files without candidates");
+            eventList.SelectedItems.Clear(); eventList.SelectedItems.Add(eventFile); Click(events, "ClearRowsButton"); Until(() => !events.IsPreviewPending);
+            check(!eventFile.Selected, "Clear highlighted event file");
+            Space(events, eventList); Until(() => !events.IsPreviewPending); check(eventFile.Selected, "Space selects highlighted event file");
+            Click(events, "ClearAllButton"); Until(() => !events.IsPreviewPending); check(!eventFile.Selected, "Global event clear");
+            eventFile.Selected = true; Until(() => !events.IsPreviewPending);
+            string alphaBefore = File.ReadAllText(Path.Combine(source, "Alpha.cpp"));
+            string eventBackup = new SourceWorkspace().Apply(events.SelectedPlan!);
+            check(File.ReadAllText(Path.Combine(source, "Alpha.cpp")) == alphaBefore && File.ReadAllText(Path.Combine(source, "Beta.cpp")).Contains("TRACE_COUNTER_INCREMENT"), "Event apply modifies only the checked file");
+            check(Directory.GetFiles(eventBackup, "*.cpp", SearchOption.AllDirectories).Length == 1, "Event backup contains one selected file");
         }
         finally { cpu.Close(); events.Close(); }
     }
     private static void Click(Window window, string name) => ((Button)window.FindName(name)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    private static void Space(Window window, DataGrid grid) => grid.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Space) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
     private static void Until(Func<bool> condition)
     {
         var time = Stopwatch.StartNew();

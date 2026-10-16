@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using UEEtc.Core.Plans;
 using UEEtc.Core.Source;
+using UEEtc.Core.Reporting;
 
 namespace UEEtc.Core.Features.EventCounters;
 
@@ -17,6 +18,7 @@ public sealed record EventCounterCandidate(string Id, string RelativePath, strin
 }
 
 public sealed record EventCounterSelection(string Id, string CounterName, string DisplayName, QuantityCounterSelection? Quantity = null);
+public sealed record EventCounterPreviewResult(AnalysisPlan? Plan, IReadOnlyList<string> Errors);
 
 public sealed class EventCounterScan
 {
@@ -170,9 +172,9 @@ public sealed class EventCounterService
                             var addValues = QuantityCounterValues.Find(function, tokens, tokens[open].End);
                             candidates.Add(new(id, relativePath, function.Name, line, branch, condition, hint,
                                 (branch == "If" ? "条件が真の分岐" : "対応条件が偽の分岐") + "への到達を数える。成功・失敗の意味は要確認。",
-                                name, "UEEtc/Events/" + relativePath + "/" + function.Name + "/" + branch + number)
+                                name, TraceDisplayNames.Event(function.Name, branch, number))
                             { Position = tokens[open].End, Indent = SourceIndentation.Block(document.Text, tokens, open, close), AddValues = addValues,
-                                RecommendedQuantity = QuantityRecommendation.Find(addValues) });
+                                RecommendedQuantity = QuantityRecommendation.Find(addValues, tokens, open, close, syntax.Pairs) });
                         }
                     }
                 }
@@ -193,43 +195,61 @@ public sealed class EventCounterService
         CancellationToken cancellationToken = default)
         => Build(scan, selections, true, cancellationToken);
 
+    public EventCounterPreviewResult TryBuildPreview(EventCounterScan scan, IEnumerable<EventCounterSelection> selections, CancellationToken cancellationToken = default)
+    {
+        var requested = selections.ToArray();
+        var errors = Validate(scan, requested, true);
+        return errors.Count > 0 ? new(null, errors) : new(Build(scan, requested, true, cancellationToken), []);
+    }
+
+    private static IReadOnlyList<string> Validate(EventCounterScan scan, EventCounterSelection[] requested, bool allowUnconfirmed)
+    {
+        var errors = new List<string>(); var seen = new HashSet<string>(StringComparer.Ordinal);
+        var available = scan.Candidates.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        foreach (var s in requested)
+        {
+            if (s is null || string.IsNullOrWhiteSpace(s.Id) || !available.TryGetValue(s.Id, out var candidate)) { errors.Add("候補が存在しません。再解析してください。"); continue; }
+            if (!seen.Add(s.Id)) errors.Add("同じ候補が複数回選択されています。");
+            Metric(s.CounterName, s.DisplayName);
+            if (s.Quantity is not { } q) continue;
+            Metric(q.CounterName, q.DisplayName);
+            if (string.IsNullOrWhiteSpace(q.Unit) || q.Unit.Any(char.IsControl)) errors.Add(candidate.DisplayName + ": ADD の単位を入力してください。");
+            if (string.IsNullOrWhiteSpace(q.Value) || !QuantityCounterValues.IsAllowed(q.Value, candidate)) errors.Add(candidate.DisplayName + ": ADD の値を候補一覧または十進整数で入力してください。");
+            if (!allowUnconfirmed && !q.MeaningConfirmed) errors.Add(candidate.DisplayName + ": ADD の数量と単位の意味を確認してください。");
+        }
+        return errors;
+        void Metric(string name, string display)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !Regex.IsMatch(name, @"^[A-Za-z][A-Za-z0-9_]*$") || name.Contains("__", StringComparison.Ordinal)) errors.Add("カウンター名は英字で始まる識別子にしてください（二重アンダースコアは不可）。");
+            if (string.IsNullOrWhiteSpace(display) || display.Any(char.IsControl)) errors.Add("表示名には空白だけの名前や制御文字を使用できません。");
+        }
+    }
+
     private AnalysisPlan Build(EventCounterScan scan, IEnumerable<EventCounterSelection> selections,
         bool allowUnconfirmed, CancellationToken cancellationToken)
     {
         var requested = selections.ToArray();
-        if (requested.Any(s => s is null || string.IsNullOrWhiteSpace(s.Id) || string.IsNullOrWhiteSpace(s.CounterName) || string.IsNullOrWhiteSpace(s.DisplayName)))
-            throw new ArgumentException("選択には Id / CounterName / DisplayName が必要です。");
+        var validation = Validate(scan, requested, allowUnconfirmed);
+        if (validation.Count > 0) throw new ArgumentException(string.Join(Environment.NewLine, validation));
         var available = scan.Candidates.ToDictionary(c => c.Id, StringComparer.Ordinal);
-        if (requested.Select(s => s.Id).Distinct(StringComparer.Ordinal).Count() != requested.Length)
-            throw new ArgumentException("同じ候補が複数回選択されています。");
         var used = new HashSet<string>(scan.ReservedNames, StringComparer.Ordinal);
         var assigned = new Dictionary<string, string>(StringComparer.Ordinal);
         var metrics = requested.SelectMany(s => new[] { s.CounterName }.Concat(s.Quantity is { } q ? new[] { q.CounterName } : []));
-        if (metrics.Any(string.IsNullOrWhiteSpace)) throw new ArgumentException("数量カウンターの名前がありません。");
         var groups = metrics.GroupBy(name => name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
         var displays = requested.SelectMany(s => new[] { s.DisplayName }.Concat(s.Quantity is { } q ? new[] { q.DisplayName } : []));
         var duplicateDisplays = displays.GroupBy(name => name, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
         foreach (var s in requested.OrderBy(s => s.Id, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!available.ContainsKey(s.Id)) throw new ArgumentException("候補が存在しません。再解析してください: " + s.Id);
-            Allocate(s.Id, s.CounterName, s.DisplayName);
+            Allocate(s.Id, s.CounterName);
             if (s.Quantity is { } q)
             {
-                if ((!allowUnconfirmed && !q.MeaningConfirmed) || string.IsNullOrWhiteSpace(q.Unit) || q.Unit.Any(char.IsControl))
-                    throw new ArgumentException("ADD の数量・単位・この位置で数える意味を確認してください。");
-                if (string.IsNullOrWhiteSpace(q.Value) || !QuantityCounterValues.IsAllowed(q.Value, available[s.Id]))
-                    throw new ArgumentException("ADD 値は候補の AddValues または 0～4294967295 の十進整数だけを指定できます。関数呼び出し・任意式・未確認の変数は使用できません。");
-                Allocate(s.Id + "_Quantity", q.CounterName, q.DisplayName);
+                Allocate(s.Id + "_Quantity", q.CounterName);
             }
         }
 
-        void Allocate(string id, string requestedName, string display)
+        void Allocate(string id, string requestedName)
         {
-            if (!Regex.IsMatch(requestedName, @"^[A-Za-z][A-Za-z0-9_]*$") || requestedName.Contains("__", StringComparison.Ordinal))
-                throw new ArgumentException("カウンター名は英字で始まる識別子にしてください（二重アンダースコアは不可）。");
-            if (string.IsNullOrWhiteSpace(display) || display.Any(char.IsControl))
-                throw new ArgumentException("表示名には空白だけの名前や制御文字を使用できません。");
             string name = requestedName;
             if (groups[name] > 1 || used.Contains(name) || used.Contains("__GTraceCounter" + name)) name += "_" + id;
             string stem = name;
@@ -252,7 +272,7 @@ public sealed class EventCounterService
             foreach (var s in selected)
             {
                 var c = available[s.Id]; string name = assigned[s.Id];
-                string insert = newline + c.Indent + "// UEEtc: event " + c.Id + newline + c.Indent + "TRACE_COUNTER_INCREMENT(" + name + ");" + newline;
+                string insert = newline + c.Indent + "TRACE_COUNTER_INCREMENT(" + name + ");" + newline;
                 string display = duplicateDisplays.Contains(s.DisplayName) ? s.DisplayName + " [" + s.Id + "]" : s.DisplayName;
                 declarations.Add(unit + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + name + ", TEXT(\"" + Escape(display) + "\"));");
                 if (s.Quantity is { } q)
@@ -268,7 +288,7 @@ public sealed class EventCounterService
             }
             string header = syntax.HasCounterInclude ? "" : "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
             if (syntax.IncludeAnchor > 0 && doc.Text[syntax.IncludeAnchor - 1] != '\n') header = newline + header;
-            edits.Add((syntax.IncludeAnchor, header + newline + "// UEEtc: selected branch entry counters" + newline + "namespace {" + newline + string.Join(newline, declarations) + newline + "}" + newline));
+            edits.Add((syntax.IncludeAnchor, header + newline + "namespace {" + newline + string.Join(newline, declarations) + newline + "}" + newline));
             var output = new StringBuilder(doc.Text);
             foreach (var edit in edits.OrderByDescending(e => e.Position)) output.Insert(edit.Position, edit.Text);
             string text = output.ToString();

@@ -1,5 +1,6 @@
 using UEEtc.Core.Source;
 using UEEtc.Core.Plans;
+using UEEtc.Core.Reporting;
 
 using System.Security.Cryptography;
 using System.Text;
@@ -45,7 +46,7 @@ public sealed class CppInstrumenter
                 if (needsCounterHeader && !Includes(includes, "CountersTrace.h"))
                     declarations += "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
                 if (counters.Count > 0)
-                    declarations += newline + "// UEEtc: cumulative function entry counters" + newline +
+                    declarations += newline +
                         "namespace {" + newline + string.Join(newline, counters) + newline + "}" + newline;
                 int position = anchor!.End;
                 if (position > 0 && document.Text[position - 1] != '\n') declarations = newline + declarations;
@@ -135,7 +136,7 @@ public sealed class CppInstrumenter
                 string signature = namespaceName + string.Join(" ", header.Select(t => t.Text));
                 string identity = relativePath.Replace('\\', '/') + "|" + signature;
                 string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))[..16];
-                string label = "UEEtc/" + relativePath.Replace('\\', '/') + "/" + namespaceName + name + " [" + hash + "]";
+                string label = TraceDisplayNames.Function(name);
                 // CPU labels are intentionally short; source paths and function metadata remain in the report.
                 string cpuLabel = name.Contains("::", StringComparison.Ordinal)
                     ? string.Join(" ", name.Split("::").TakeLast(2)) : name;
@@ -151,19 +152,17 @@ public sealed class CppInstrumenter
                 if (addCpu)
                 {
                     needsCpuHeader = true;
-                    string insert = newline + indent + "// UEEtc: CPU scope" + newline +
-                        indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(cpuLabel) + "\");" + newline;
+                    string insert = newline + indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(cpuLabel) + "\");" + newline;
                     // Insertion stays in the function scope so RAII ends at the function's closing brace.
                     edits.Add((cpuPlacement.Position!.Value, insert));
                 }
                 if (addCounter)
                 {
                     needsCounterHeader = true;
-                    string declaration = SourceIndentation.Unit(document.Text) + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + "/Calls") + "\"));";
+                    string declaration = SourceIndentation.Unit(document.Text) + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + " Calls [" + hash + "]") + "\"));";
                     if (!counters.Contains(declaration)) counters.Add(declaration);
                     // Legacy function entry counters keep their entry semantics, including before Super calls.
-                    edits.Add((tokens[open].End, newline + indent + "// UEEtc: function entry counter" + newline +
-                        indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline));
+                    edits.Add((tokens[open].End, newline + indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline));
                 }
                 functions.Add(new(name, line, "Add", decisions, counter)
                 {

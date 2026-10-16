@@ -3,11 +3,12 @@ using UEEtc.Core.Plans;
 
 namespace UEEtc.Wpf.Preview;
 
-public sealed class SelectableFile(FileAnalysis file, Action changed) : INotifyPropertyChanged
+public sealed class SelectableFile(FileAnalysis file, Action changed) : INotifyPropertyChanged, ISelectionRow
 {
     public FileAnalysis File { get; } = file;
     public string RelativePath => File.RelativePath;
     public int AddedFunctions => File.AddedFunctions;
+    public bool CanSelect => File.HasChanges;
     private bool selected;
     public bool Selected { get => selected; set { if (selected == value) return; selected = value; PropertyChanged?.Invoke(this, new(nameof(Selected))); changed(); } }
     public event PropertyChangedEventHandler? PropertyChanged;

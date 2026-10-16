@@ -11,6 +11,7 @@ using UEEtc.Wpf.InputAssistance;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Threading;
+using UEEtc.Wpf.Preview;
 
 namespace UEEtc.Wpf.Features.EventCounters;
 
@@ -18,11 +19,12 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
     string? savedName = null, string? savedDisplay = null) : INotifyPropertyChanged
 {
     public EventCounterCandidate Candidate { get; } = candidate;
-    private bool selected;
+    private bool selected = true;
     private string counterName = savedName ?? candidate.SuggestedName;
     private string displayName = savedDisplay ?? candidate.DisplayName;
-    private bool quantityEnabled = candidate.RecommendedQuantity is not null, meaningConfirmed;
-    private string quantityName = candidate.SuggestedName + "Quantity", quantityDisplay = candidate.DisplayName + "/Quantity",
+    private bool quantityEnabled = candidate.RecommendedQuantity is not null, meaningConfirmed = candidate.RecommendedQuantity is not null;
+    private string quantityName = candidate.RecommendedQuantity?.CreateInputSelection(candidate).CounterName ?? candidate.SuggestedName + "Quantity",
+        quantityDisplay = candidate.RecommendedQuantity?.CreateInputSelection(candidate).DisplayName ?? candidate.DisplayName + " Quantity",
         quantityValue = candidate.RecommendedQuantity?.Value ?? "", quantityUnit = candidate.RecommendedQuantity?.Unit ?? "";
     public string Recommendation => Candidate.RecommendedQuantity is { } q ? $"{q.Value} [{q.Unit}] — {q.Reason}" : "推奨なし（値・単位を安全に推定できない、または候補が複数）";
     public bool QuantityEnabled { get => quantityEnabled; set { quantityEnabled = value; Changed(nameof(QuantityEnabled)); } }
@@ -46,6 +48,9 @@ public partial class EventCountersWindow : Window
     private EventCounterScan? scan;
     private AnalysisPlan? plan;
     private List<CandidateRow> rows = [];
+    private List<EventFileRow> files = [];
+    private bool HasFileSelection => files.Any(f => f.Selected && f.CanSelect);
+    public AnalysisPlan? SelectedPlan => plan is null ? null : plan with { Files = plan.Files.Where(f => files.Any(row => row.Selected && row.RelativePath == f.RelativePath)).ToArray() };
     private CancellationTokenSource? cancellation;
     private bool busy;
     private bool previewBuilding;
@@ -58,6 +63,7 @@ public partial class EventCountersWindow : Window
     public EventCountersWindow(InputSettingsStore settings)
     {
         InitializeComponent();
+        SelectionActions.Attach(FileList);
         previewTimer.Tick += (_, _) => { previewTimer.Stop(); if (!busy && scan is not null) Preview_Click(this, new RoutedEventArgs()); };
         inputs = new(this, settings, text => StatusText.Text = text);
         inputs.Bind(SourcePath, "EventCounters.SourcePath");
@@ -73,7 +79,8 @@ public partial class EventCountersWindow : Window
         if (ExportButton is null) return;
         ExportButton.IsEnabled = ApplyButton.IsEnabled = false;
         PreviewText.Clear();
-        StatusText.Text = $"選択 {rows.Count(r => r.Selected)} / 候補 {rows.Count} 件。選択・名前を確認してプレビューしてください。絞り込みで隠れた選択も対象です。";
+        foreach (var file in files) file.RefreshCount();
+        StatusText.Text = $"適用選択 {files.Count(f => f.Selected)} ファイル / 候補 {rows.Count} 件。変更案を更新します。検索で隠れた選択も対象です。";
         QueuePreview();
     }
     private void QueuePreview()
@@ -84,7 +91,7 @@ public partial class EventCountersWindow : Window
     private void SourceChanged(object sender, TextChangedEventArgs e)
     {
         if (AnalyzeButton is null || busy) return;
-        scan = null; rows = []; CandidateList.ItemsSource = null;
+        scan = null; rows = []; files = []; FileList.ItemsSource = CandidateList.ItemsSource = null;
         ContextText.Text = OriginalText.Text = DiagnosticsText.Text = "";
         PreviewButton.IsEnabled = CandidateList.IsEnabled = false;
         InvalidatePlan();
@@ -96,7 +103,7 @@ public partial class EventCountersWindow : Window
     }
     private async void Analyze_Click(object sender, RoutedEventArgs e)
     {
-        scan = null; rows = []; CandidateList.ItemsSource = null; InvalidatePlan();
+        scan = null; rows = []; files = []; FileList.ItemsSource = CandidateList.ItemsSource = null; InvalidatePlan();
         ContextText.Text = OriginalText.Text = DiagnosticsText.Text = "";
         string root = SourcePath.Text.Trim();
         using var cts = new CancellationTokenSource(); cancellation = cts;
@@ -108,11 +115,12 @@ public partial class EventCountersWindow : Window
             string scope = "EventCounters.Edits." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(scan.Snapshot.RootPath.ToUpperInvariant()))) + ".";
             rows = scan.Candidates.OrderBy(c => c.Hint == "条件分岐").Select(c => new CandidateRow(c, InvalidatePlan,
                 row => { inputs.Set(scope + c.Id + ".Name", row.CounterName); inputs.Set(scope + c.Id + ".Display", row.DisplayName); },
-                inputs.Get(scope + c.Id + ".Name"), inputs.Get(scope + c.Id + ".Display"))).ToList();
-            CandidateList.ItemsSource = rows;
+                inputs.Get(scope + c.Id + ".Name"), RestoredDisplay(c, inputs.Get(scope + c.Id + ".Display")))).ToList();
+            files = scan.Snapshot.Files.Select(f => new EventFileRow(f, rows.Where(r => r.Candidate.RelativePath == f.RelativePath).ToArray(), InvalidatePlan)).ToList();
+            FileList.ItemsSource = files;
             FilterChanged(this, new TextChangedEventArgs(TextBox.TextChangedEvent, UndoAction.None));
             DiagnosticsText.Text = string.Join(Environment.NewLine, scan.Snapshot.Diagnostics.Concat(scan.Snapshot.Files.SelectMany(f => f.Diagnostics.Select(d => f.RelativePath + ": " + d))));
-            CandidateList.SelectedItem = CandidateList.Items.Cast<CandidateRow>().FirstOrDefault();
+            FileList.SelectedItem = FileList.Items.Cast<EventFileRow>().FirstOrDefault(f => f.CanSelect) ?? FileList.Items.Cast<EventFileRow>().FirstOrDefault();
             await RefreshPreview();
         }
         catch (OperationCanceledException) { StatusText.Text = "解析を中止しました。"; }
@@ -121,10 +129,25 @@ public partial class EventCountersWindow : Window
     }
     private void FilterChanged(object sender, TextChangedEventArgs e)
     {
-        if (CandidateList?.ItemsSource is null) return;
+        if (FileList?.ItemsSource is null) return;
         string query = FilterText.Text.Trim();
-        CollectionViewSource.GetDefaultView(CandidateList.ItemsSource).Filter = value => value is CandidateRow row &&
-            (query.Length == 0 || (row.Candidate.RelativePath + " " + row.Candidate.Function + " " + row.Candidate.Condition + " " + row.Candidate.Hint).Contains(query, StringComparison.OrdinalIgnoreCase));
+        CollectionViewSource.GetDefaultView(FileList.ItemsSource).Filter = value => value is EventFileRow row &&
+            (query.Length == 0 || (row.RelativePath + " " + string.Join(" ", row.Candidates.Select(c => c.Candidate.Function + " " + c.Candidate.Condition + " " + c.Candidate.Hint))).Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+    private static string? RestoredDisplay(EventCounterCandidate c, string? saved) => saved?.StartsWith("UEEtc/Events/" + c.RelativePath + "/" + c.Function + "/", StringComparison.Ordinal) == true ? null : saved;
+    private void FileSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (FileList.SelectedItem is not EventFileRow file) { CandidateList.ItemsSource = null; OriginalText.Text = ContextText.Text = ""; PreviewText.Clear(); return; }
+        CandidateList.ItemsSource = file.Candidates;
+        CandidateList.SelectedItem = file.Candidates.FirstOrDefault();
+        ShowFile(file.RelativePath);
+    }
+    private void ShowFile(string relativePath)
+    {
+        var file = plan?.Files.SingleOrDefault(f => f.RelativePath == relativePath) ?? scan?.Snapshot.Files.SingleOrDefault(f => f.RelativePath == relativePath);
+        if (file is null) return;
+        OriginalText.Text = file.OriginalText;
+        PreviewText.ShowComparison(file.OriginalText, file.ProposedText);
     }
     private void CandidateSelected(object sender, SelectionChangedEventArgs e)
     {
@@ -136,8 +159,6 @@ public partial class EventCountersWindow : Window
         int start = Math.Max(0, c.Line - 5), end = Math.Min(lines.Length, c.Line + 9);
         ContextText.Text = c.RelativePath + ":" + c.Line + "  " + c.Function + Environment.NewLine + c.Reason + Environment.NewLine +
             string.Join(Environment.NewLine, Enumerable.Range(start, end - start).Select(i => $"{i + 1,5}: {lines[i]}"));
-        var proposed = plan?.Files.SingleOrDefault(f => f.RelativePath == c.RelativePath) ?? file;
-        PreviewText.ShowComparison(file.OriginalText, proposed.ProposedText);
     }
     private async void Preview_Click(object sender, RoutedEventArgs e)
     {
@@ -150,19 +171,20 @@ public partial class EventCountersWindow : Window
         CandidateList.CommitEdit(DataGridEditingUnit.Cell, true); CandidateList.CommitEdit(DataGridEditingUnit.Row, true);
         if (scan is null) return;
         var current = scan;
-        bool selected = rows.Any(r => r.Selected);
-        var selections = rows.Where(r => !selected || r.Selected).Select(r => r.Selection()).ToArray();
+        bool selected = HasFileSelection;
+        var selectedPaths = files.Where(f => f.Selected).Select(f => f.RelativePath).ToHashSet(StringComparer.Ordinal);
+        var selections = rows.Where(r => r.Selected && (!selected || selectedPaths.Contains(r.Candidate.RelativePath))).Select(r => r.Selection()).ToArray();
         plan = null; PreviewText.Clear(); previewBuilding = true; SetBusy(true);
         int version = revision;
         try
         {
             var token = cancellation?.Token ?? CancellationToken.None;
-            var built = await Task.Run(() => service.BuildPreview(current, selections, token));
+            var result = await Task.Run(() => service.TryBuildPreview(current, selections, token));
             if (version != revision) return;
-            plan = built;
-            var file = CandidateList.SelectedItem is CandidateRow row ? plan.Files.Single(f => f.RelativePath == row.Candidate.RelativePath) : plan.Files.FirstOrDefault(f => f.HasChanges);
-            if (file is not null) PreviewText.ShowComparison(file.OriginalText, file.ProposedText);
-            StatusText.Text = ReportExporter.Summary(plan) + (selected ? "。チェック済み候補の変更案。" : "。全候補の参考プレビュー。適用する候補をチェックしてください（選択0件）。") +
+            if (result.Plan is null) { StatusText.Text = "プレビューを更新できません: " + string.Join(" / ", result.Errors.Distinct().Take(5)); return; }
+            plan = result.Plan;
+            if (FileList.SelectedItem is EventFileRow file) ShowFile(file.RelativePath);
+            StatusText.Text = ReportExporter.Summary(plan) + (selected ? $"。適用選択 {files.Count(f => f.Selected)} ファイルの変更案。" : "。全候補の参考プレビュー。適用するファイルをチェックしてください（選択0件）。") +
                 (plan.RequiresQuantityConfirmation ? " 数量ADDは推奨・未確認です。意味と単位を確認するか、ADDを無効にしてください。" : "");
         }
         catch (Exception error) { StatusText.Text = "プレビューを更新できません: " + error.Message; }
@@ -170,24 +192,23 @@ public partial class EventCountersWindow : Window
     }
     private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (plan is null || !rows.Any(r => r.Selected)) return;
+        if (SelectedPlan is not { ChangedFiles: > 0 } current) return;
         var picker = new OpenFolderDialog { Title = "ソース外の空の出力フォルダー" };
         if (picker.ShowDialog(this) != true) return;
-        var current = plan; SetBusy(true);
+        SetBusy(true);
         try { await Task.Run(() => ReportExporter.Export(current, picker.FolderName)); StatusText.Text = "保存しました: " + picker.FolderName; }
         catch (Exception error) { ShowError(error); }
         finally { SetBusy(false); }
     }
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
-        if (plan is not { ChangedFiles: > 0, DiagnosticCount: 0, RequiresQuantityConfirmation: false } || !rows.Any(r => r.Selected)) return;
-        var current = plan;
+        if (plan is not { DiagnosticCount: 0, RequiresQuantityConfirmation: false } || SelectedPlan is not { ChangedFiles: > 0 } current) return;
         if (MessageBox.Show(this, $"{current.RootPath}\n\n{current.ChangedFiles} ファイルに選択済みイベントカウンターを追加します。\nバックアップを作成して適用しますか？", "イベントカウンターの適用", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         SetBusy(true);
         try
         {
             string backup = await Task.Run(() => new SourceWorkspace().Apply(current));
-            scan = null; rows = []; CandidateList.ItemsSource = null;
+            scan = null; rows = []; files = []; FileList.ItemsSource = CandidateList.ItemsSource = null;
             StatusText.Text = "適用しました。再解析してください。バックアップ: " + backup;
         }
         catch (Exception error) { ShowError(error); }
@@ -198,15 +219,20 @@ public partial class EventCountersWindow : Window
     {
         busy = value;
         AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = SourcePath.IsEnabled = FilterText.IsEnabled = SelectVisibleButton.IsEnabled = ClearVisibleButton.IsEnabled = !value;
+        SelectAllButton.IsEnabled = ClearAllButton.IsEnabled = SelectRowsButton.IsEnabled = ClearRowsButton.IsEnabled = !value;
         PreviewButton.IsEnabled = !value && scan is not null;
-        CandidateList.IsEnabled = QuantityEditor.IsEnabled = scan is not null && (!value || previewBuilding);
-        ExportButton.IsEnabled = !value && plan is not null && rows.Any(r => r.Selected);
-        ApplyButton.IsEnabled = !value && rows.Any(r => r.Selected) && plan is { ChangedFiles: > 0, DiagnosticCount: 0, RequiresQuantityConfirmation: false };
+        FileList.IsEnabled = CandidateList.IsEnabled = QuantityEditor.IsEnabled = scan is not null && (!value || previewBuilding);
+        ExportButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 };
+        ApplyButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 } && plan is { DiagnosticCount: 0, RequiresQuantityConfirmation: false };
         CancelButton.IsEnabled = value && cancellation is not null;
         Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }
-    private void SelectVisible_Click(object sender, RoutedEventArgs e) { foreach (var row in CandidateList.Items.Cast<CandidateRow>()) row.Selected = true; }
-    private void ClearVisible_Click(object sender, RoutedEventArgs e) { foreach (var row in CandidateList.Items.Cast<CandidateRow>()) row.Selected = false; }
+    private void SelectVisible_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.Items.OfType<ISelectionRow>(), true);
+    private void ClearVisible_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.Items.OfType<ISelectionRow>(), false);
+    private void SelectAll_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(files, true);
+    private void ClearAll_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(files, false);
+    private void SelectRows_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.SelectedItems.OfType<ISelectionRow>(), true);
+    private void ClearRows_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.SelectedItems.OfType<ISelectionRow>(), false);
     private void ShowError(Exception error)
     {
         StatusText.Text = "処理に失敗しました: " + error.Message;

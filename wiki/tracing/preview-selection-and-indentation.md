@@ -6,6 +6,8 @@ status: todo
 
 # 変更プレビュー・選択・インデント・数量推奨（Issue #23・#24・#25）
 
+一覧の粒度・選択操作・ADDの自動追加・入力検証は [Issue #27〜#30 の更新](event-files-and-input-quantities.md) を参照してください。以下は初回実装時点の操作と結果です。
+
 [目次](../README.md) / [前回の Engine 調査と数量 ADD](focused-cpu-and-quantity-counters.md)
 
 ## 調査した問題

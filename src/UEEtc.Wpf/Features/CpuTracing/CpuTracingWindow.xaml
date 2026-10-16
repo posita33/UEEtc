@@ -38,6 +38,10 @@
         <DockPanel Grid.Row="3" Margin="0,0,0,8">
             <TextBlock Text="検索" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button x:Name="SelectAllButton" Content="全選択" Click="SelectAll_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearAllButton" Content="全解除" Click="ClearAll_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectRowsButton" Content="行を選択" Click="SelectRows_Click" Padding="8,4" Margin="8,0,0,0" ToolTip="強調表示した行を適用対象にします。Ctrl/Shiftで複数行、Spaceで切替。" />
+                <Button x:Name="ClearRowsButton" Content="行を解除" Click="ClearRows_Click" Padding="8,4" Margin="8,0,0,0" />
                 <Button x:Name="SelectVisibleButton" Content="表示中を選択" Click="SelectVisible_Click" Padding="8,4" Margin="8,0,0,0" />
                 <Button x:Name="ClearVisibleButton" Content="表示中を解除" Click="ClearVisible_Click" Padding="8,4" Margin="8,0,0,0" />
             </StackPanel>
@@ -45,11 +49,11 @@
         </DockPanel>
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions><ColumnDefinition Width="360" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Single"
+            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Extended" SelectionUnit="FullRow"
                       SelectionChanged="FileList_SelectionChanged" CanUserAddRows="False" EnableRowVirtualization="True">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="適用" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate>
-                        <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding File.HasChanges}" HorizontalAlignment="Center" />
+                        <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSelect}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="28" />
                     </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
                     <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" IsReadOnly="True" Width="*" MinWidth="200">
                         <DataGridTextColumn.ElementStyle>

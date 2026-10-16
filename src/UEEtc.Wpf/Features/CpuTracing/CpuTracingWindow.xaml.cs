@@ -25,6 +25,7 @@ public partial class CpuTracingWindow : Window
     public CpuTracingWindow(InputSettingsStore settings)
     {
         InitializeComponent();
+        SelectionActions.Attach(FileList);
         inputs = new(this, settings, text => StatusText.Text = text);
         inputs.Bind(SourcePath, "CpuTracing.SourcePath");
         inputs.Bind(FilterText, "CpuTracing.Filter");
@@ -134,6 +135,7 @@ public partial class CpuTracingWindow : Window
         busy = value;
         SourcePath.IsEnabled = BrowseButton.IsEnabled = AnalyzeButton.IsEnabled = AllFunctionsOption.IsEnabled = !value;
         FileList.IsEnabled = FilterText.IsEnabled = SelectVisibleButton.IsEnabled = ClearVisibleButton.IsEnabled = !value;
+        SelectAllButton.IsEnabled = ClearAllButton.IsEnabled = SelectRowsButton.IsEnabled = ClearRowsButton.IsEnabled = !value;
         CancelButton.IsEnabled = value && canCancel;
         ExportButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 };
         ApplyButton.IsEnabled = !value && plan is { DiagnosticCount: 0 } && SelectedPlan is { ChangedFiles: > 0 };
@@ -154,6 +156,10 @@ public partial class CpuTracingWindow : Window
     }
     private void SelectVisible_Click(object sender, RoutedEventArgs e) { foreach (var file in FileList.Items.Cast<SelectableFile>()) if (file.File.HasChanges) file.Selected = true; }
     private void ClearVisible_Click(object sender, RoutedEventArgs e) { foreach (var file in FileList.Items.Cast<SelectableFile>()) file.Selected = false; }
+    private void SelectAll_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(files, true);
+    private void ClearAll_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(files, false);
+    private void SelectRows_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.SelectedItems.OfType<ISelectionRow>(), true);
+    private void ClearRows_Click(object sender, RoutedEventArgs e) => SelectionActions.Set(FileList.SelectedItems.OfType<ISelectionRow>(), false);
 
     private void ShowError(Exception error)
     {

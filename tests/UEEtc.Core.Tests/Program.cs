@@ -384,6 +384,7 @@ tests = tests.Concat(EventCounterTests.All).ToArray();
 tests = tests.Concat(CpuPolicyTests.All).ToArray();
 tests = tests.Concat(FocusAndQuantityTests.All).ToArray();
 tests = tests.Concat(PreviewWorkflowTests.All).ToArray();
+tests = tests.Concat(EventUsabilityTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {
