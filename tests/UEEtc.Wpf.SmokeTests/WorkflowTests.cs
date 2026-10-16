@@ -100,6 +100,18 @@ internal static class WorkflowTests
             string eventBackup = new SourceWorkspace().Apply(events.SelectedPlan!);
             check(File.ReadAllText(Path.Combine(source, "Alpha.cpp")) == alphaBefore && File.ReadAllText(Path.Combine(source, "Beta.cpp")).Contains("TRACE_COUNTER_INCREMENT"), "Event apply modifies only the checked file");
             check(Directory.GetFiles(eventBackup, "*.cpp", SearchOption.AllDirectories).Length == 1, "Event backup contains one selected file");
+
+            const string batch = "#include \"Fixture.h\"\nvoid F::Batch(const TArray<int>& Items) { if (Ready) { for (auto Item : Items) { Use(Item); } } }";
+            File.WriteAllText(Path.Combine(source, "Batch.cpp"), batch);
+            Click(events, "AnalyzeButton"); Until(() => !events.IsBusy);
+            row = ((IEnumerable<CandidateRow>)grid.ItemsSource).Single();
+            check(row.IncludeActiveScope && row.QuantityEnabled && !row.TrackActiveScopes, "Analyze automatically adds companion scope and quantity without changing cumulative measurement");
+            check(eventPreview.Text.Contains("TRACE_COUNTER_ADD(") && eventPreview.Text.Contains("TRACE_COUNTER_DECREMENT("), "Analyze alone previews both ADD and DECREMENT");
+            check(eventPreview.Text.Contains("TRACE_COUNTER_INCREMENT(F_Batch_If1_Count)") && !eventPreview.Text.Contains("TRACE_COUNTER_DECREMENT(F_Batch_If1_Count)"), "Automatic decrement preserves cumulative count");
+            check(((TextBlock)events.FindName("PreviewSummary")).Text.Contains("累積回数は保持"), "Preview explains automatic decisions without opening details");
+            check(!((Expander)events.FindName("AdvancedOptions")).IsExpanded, "Manual settings are optional and collapsed");
+            check(File.ReadAllText(Path.Combine(source, "Batch.cpp")) == batch, "Analyze does not write automatic proposals into source");
+            if (screenshots is not null) Program.Screenshot(events, Path.Combine(screenshots, "automatic-counters.png"), 1280, 900);
         }
         finally { cpu.Close(); events.Close(); }
     }

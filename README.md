@@ -15,7 +15,7 @@ CPU のラベルは「クラス名 関数名」です。対応する `Super::同
 
 イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択したファイルにだけ追加します。ファイルの適用選択は初期0件です。[現行の使い方と構成](wiki/tracing/event-files-and-input-quantities.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
 
-CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とSTRは同じ静的ID経路で、STRは動的文字列用ではありません。イベントは累積回数を標準とし、分岐の現在数を選んだ場合は退出時のDECREMENTを追加します。[Engine調査と計測モードの使い分け](wiki/tracing/cpu-macros-and-counter-lifetimes.md)を参照してください。
+CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とSTRは同じ静的ID経路で、STRは動的文字列用ではありません。[Engine調査と計測モードの使い分け](wiki/tracing/cpu-macros-and-counter-lifetimes.md)を参照してください。
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
@@ -77,7 +77,7 @@ dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/
 
 WPF はメイン画面から機能を選び、ソースフォルダーを指定して「解析・プレビュー」を実行します。両画面ともファイル単位の一覧で、初期の適用選択は0件です。全体・表示中・強調行の選択／解除、Ctrl/Shiftの複数行選択、Space切替に対応します。変更行を緑色と「+」で示し、前後の変更箇所へ移動できます。
 
-イベントの「候補・名前・数量ADD」で分岐の除外と名前の編集ができます。推奨の入力数量は自動で追加し、手入力を変更した数量は意味・単位を確認してから適用します。表示名はクラス・関数・分岐を先頭にした短い形式です。[操作・推奨条件・入力検証の詳細](wiki/tracing/event-files-and-input-quantities.md)を参照してください。
+イベントは「解析・プレビュー」で入力数量のADDを自動設定し、入力配列を直接処理するバッチ分岐には別のスコープ現在数（入口INCREMENT・退出DECREMENT）も追加します。累積回数は保持します。付与後プレビューで追加内容・理由・差分を確認できます。「候補・詳細設定」では候補の除外と、折りたたみ内の名前・値の変更ができます。[自動設定の条件・操作・実験結果](wiki/tracing/automatic-counter-preview.md)を参照してください。
 
 CPU はループ・対象API・複数の処理呼び出しを根拠に候補を絞ります。「全関数（互換）」または `cpu <path> --all-functions` で従来の対象に戻せます。[CPU の Engine 調査・使い方・実験結果](wiki/tracing/focused-cpu-and-quantity-counters.md)を参照してください。
 

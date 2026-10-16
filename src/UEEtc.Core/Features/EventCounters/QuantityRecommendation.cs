@@ -5,6 +5,7 @@ namespace UEEtc.Core.Features.EventCounters;
 
 public sealed record QuantityRecommendation(string Value, string Unit, string Reason)
 {
+    public bool IsDirectBatch { get; init; }
     public QuantityCounterSelection CreateInputSelection(EventCounterCandidate candidate)
     {
         string suffix = Unit == "bytes" ? "InputBytes" : "InputItems";
@@ -15,7 +16,7 @@ public sealed record QuantityRecommendation(string Value, string Unit, string Re
     {
         var candidates = available.Select(name =>
         {
-            if (name.EndsWith(".Num()", StringComparison.Ordinal)) return HasDirectBatch(name[..^6]) ? new QuantityRecommendation(name, "items", "この分岐の直接のループが入力配列を処理する。Engine のバッチ計測と同じ Num() で入力要素数を累積する（成功件数ではない）。") : null;
+            if (name.EndsWith(".Num()", StringComparison.Ordinal)) return HasDirectBatch(name[..^6]) ? new QuantityRecommendation(name, "items", "この分岐の直接のループが入力配列を処理する。Engine のバッチ計測と同じ Num() で入力要素数を累積する（成功件数ではない）。") { IsDirectBatch = true } : null;
             string normalized = name.Replace("_", "", StringComparison.Ordinal);
             string? unit = Regex.IsMatch(normalized, @"^(?:In)?(?:NumBytes|ByteCount|Bytes|BytesWritten|BytesRead|WrittenBytes|ReadBytes)$", RegexOptions.IgnoreCase) ? "bytes" :
                 Regex.IsMatch(normalized, @"^(?:In)?(?:NumItems|ItemCount|NumElements|ElementCount)$", RegexOptions.IgnoreCase) ? "items" : null;

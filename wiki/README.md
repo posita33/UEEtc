@@ -13,6 +13,7 @@ Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録
 - [変更プレビュー・選択・インデント・数量推奨（Issue #23・#24・#25）](tracing/preview-selection-and-indentation.md)
 - [ファイル選択・数量の自動追加・短い表示名（Issue #27〜#30）](tracing/event-files-and-input-quantities.md)
 - [CPU マクロ選択とカウンターの生存区間（Issue #32・#33）](tracing/cpu-macros-and-counter-lifetimes.md)
+- [解析時のADD・DECREMENT自動設定とプレビュー（Issue #35）](tracing/automatic-counter-preview.md)
 
 - [UE 5.8 のマクロ使用条件と付与方針](tracing/engine-research.md)
 - [Engine のカウンター名の共有・重複傾向と命名改善（Issue #3）](tracing/counter-naming.md)

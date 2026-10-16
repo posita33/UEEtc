@@ -21,6 +21,10 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
     public EventCounterCandidate Candidate { get; } = candidate;
     private bool selected = true;
     private bool trackActiveScopes;
+    private bool includeActiveScope = EventCounterDefaults.Create(candidate).IncludeActiveScope;
+    public bool IncludeActiveScope { get => includeActiveScope; set { includeActiveScope = value; if (value) TrackActiveScopes = false; Changed(nameof(IncludeActiveScope)); } }
+    public string AutomaticDecision => EventCounterDefaults.Explain(Candidate);
+    public string PlannedMacros => "INCREMENT" + (IncludeActiveScope || TrackActiveScopes ? " + DECREMENT（スコープ）" : "") + (QuantityEnabled ? " + ADD " + QuantityValue + " [" + QuantityUnit + "]" : "");
     private bool changingMeasurement;
     public bool TrackActiveScopes
     {
@@ -28,6 +32,7 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
         set
         {
             if (trackActiveScopes == value) return;
+            if (value) IncludeActiveScope = false;
             changingMeasurement = true;
             string activeName = Candidate.SuggestedName.EndsWith("_Count", StringComparison.Ordinal) ? Candidate.SuggestedName[..^6] + "_ActiveScopes" : Candidate.SuggestedName + "_ActiveScopes";
             if (CounterName == (value ? Candidate.SuggestedName : activeName)) CounterName = value ? activeName : Candidate.SuggestedName;
@@ -52,10 +57,10 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
     public string CounterName { get => counterName; set { counterName = value; Changed(nameof(CounterName)); } }
     public string DisplayName { get => displayName; set { displayName = value; Changed(nameof(DisplayName)); } }
     public event PropertyChangedEventHandler? PropertyChanged;
-    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); if (!changingMeasurement && name is nameof(CounterName) or nameof(DisplayName)) edited?.Invoke(this); }
+    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); PropertyChanged?.Invoke(this, new(nameof(PlannedMacros))); changed(); if (!changingMeasurement && name is nameof(CounterName) or nameof(DisplayName)) edited?.Invoke(this); }
     public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName,
         QuantityEnabled ? new(QuantityName, QuantityDisplay, QuantityValue, QuantityUnit, MeaningConfirmed) : null,
-        TrackActiveScopes ? CounterMeasurement.ActiveScope : CounterMeasurement.Cumulative);
+        TrackActiveScopes ? CounterMeasurement.ActiveScope : CounterMeasurement.Cumulative, IncludeActiveScope);
 }
 
 public partial class EventCountersWindow : Window
@@ -95,6 +100,7 @@ public partial class EventCountersWindow : Window
         if (ExportButton is null) return;
         ExportButton.IsEnabled = ApplyButton.IsEnabled = false;
         PreviewText.Clear();
+        PreviewSummary.Text = "";
         foreach (var file in files) file.RefreshCount();
         StatusText.Text = $"適用選択 {files.Count(f => f.Selected)} ファイル / 候補 {rows.Count} 件。変更案を更新します。検索で隠れた選択も対象です。";
         QueuePreview();
@@ -164,6 +170,9 @@ public partial class EventCountersWindow : Window
         if (file is null) return;
         OriginalText.Text = file.OriginalText;
         PreviewText.ShowComparison(file.OriginalText, file.ProposedText);
+        PreviewSummary.Text = $"このファイル: イベント {file.AddedEventCounters} 箇所、DECREMENT {file.AddedDecrements} 箇所、ADD {file.AddedQuantityCounters} 箇所。\n" +
+            string.Join("\n", rows.Where(r => r.Candidate.RelativePath == relativePath && r.Selected && file.Functions.Any(f => f.Line == r.Candidate.Line && f.Name == r.Candidate.Function))
+                .Select(r => $"L{r.Candidate.Line} {r.Candidate.Function}: {r.PlannedMacros}\n  解析時の判断: {r.AutomaticDecision}"));
     }
     private void CandidateSelected(object sender, SelectionChangedEventArgs e)
     {
