@@ -6,6 +6,8 @@ status: todo
 
 # イベントカウンターの付与条件と機能分離
 
+再オープンした Issue #10 で[候補の有用性を再調査](counter-effectiveness-review.md)しました。以下の全候補列挙や 7 箇所の選択例は実装・構文検証の履歴で、新しい推奨候補とは扱いません。特に可否チェックの拒否回数と実際の操作失敗は別の測定です。現行コードの候補抽出はまだ変更していません。
+
 CPU 側は Issue #12・#13 で短いラベルと Super 後の配置へ変更しています。[CPU の現行規則](cpu-scope-policy.md)を参照してください。以下の構成・イベント機能の操作は引き続き利用できます。
 
 [目次](../README.md) / [Issue #10](https://github.com/posita33/UEEtc/issues/10) / [従来の独立判定](independent-trace-policy.md)

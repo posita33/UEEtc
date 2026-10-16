@@ -17,5 +17,6 @@ Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録
 - [イベントカウンターの付与条件・機能別画面・名前空間（Issue #10、現行）](tracing/event-counters.md)
 - [QUICK_SCOPE_CYCLE_COUNTER の使い方と有効条件（Issue #11）](tracing/quick-scope-cycle-counter.md)
 - [CPU ラベルの簡略化と Super 後の配置（Issue #12・#13、現行）](tracing/cpu-scope-policy.md)
+- [イベントカウンターの候補を絞る再調査（Issue #10 再開）](tracing/counter-effectiveness-review.md)
 
 2026-10-16 の実験では、対象プロジェクトを読み取り、差分と加工済みコピーだけをリポジトリ内の `artifacts/` に出力しました。元の Source フォルダーには適用していません。
