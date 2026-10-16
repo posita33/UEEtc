@@ -9,6 +9,7 @@ status: todo
 [目次](../README.md) / [操作説明](automatic-counter-preview.md) / [新機能の候補](trace-feature-candidates.md)
 
 2026-10-16時点の実装を、CPUスコープ付与とイベントカウンター付与の2機能に分けて整理する。
+両機能を1回の操作で実行する[統合画面（Issue #45）](combined-tracing.md)も利用できる。各機能の条件は以下と共通である。
 Engineの調査対象は `C:/Program Files/Epic Games/UE_5.8/Engine`。以下のEngine参照パスはこのフォルダーからの相対パスで、行番号もこのインストールに対応する。
 他のUEバージョンではマクロ定義と利用例を確認し直す。
 

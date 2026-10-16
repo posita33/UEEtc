@@ -1,11 +1,17 @@
 <Window x:Class="UEEtc.Wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="UEEtc" Width="860" Height="520" MinWidth="700" MinHeight="440">
+        Title="UEEtc" Width="860" Height="660" MinWidth="700" MinHeight="500">
     <Grid Margin="32" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
-        <StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
             <TextBlock Text="Unreal Engine 開発ツール" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="使う機能を選択してください。機能ごとに独立した画面で開きます。" Margin="0,12,0,26" />
+            <TextBlock Text="まとめて付与する画面と、各機能を個別に使う画面を選べます。" Margin="0,12,0,26" />
+            <Button x:Name="CombinedFeatureButton" Click="OpenCombined_Click" HorizontalContentAlignment="Left" Padding="20" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="CPU・イベント統合付与" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="1回の解析で両方をプレビューし、ADD・DECREMENTもまとめて適用します。" Margin="0,8,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </Button>
             <Button x:Name="CpuFeatureButton" Click="OpenCpu_Click" HorizontalContentAlignment="Left" Padding="20" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="CPU スコープ付与" FontSize="20" FontWeight="SemiBold" />
@@ -19,6 +25,6 @@
                 </StackPanel>
             </Button>
             <TextBlock Text="各画面の解析・プレビュー・レポート保存では元ソースを変更しません。" Margin="0,24,0,0" TextWrapping="Wrap" />
-        </StackPanel>
+        </StackPanel></ScrollViewer>
     </Grid>
 </Window>

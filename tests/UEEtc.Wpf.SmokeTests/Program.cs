@@ -142,6 +142,7 @@ internal static class Program
             Assert(File.ReadAllText(Path.Combine(root, "Fixture.cpp")) == source, "All previews preserve original source");
             InputAssistanceTests.Run(root, Assert);
             WorkflowTests.Run(root, Assert, args.FirstOrDefault());
+            CombinedWorkflowTests.Run(home, root, Assert, args.FirstOrDefault());
             Console.WriteLine($"WPF smoke: {checks} checks passed (launcher, separate windows, selection, naming, filtering, invalidation, source unchanged).");
             return 0;
         }
