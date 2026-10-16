@@ -8,6 +8,13 @@ status: todo
 
 Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録です。
 
+現行の全体像と次の機能候補:
+
+- [CPU・イベントの付与ロジックとEngine参照箇所（Issue #43）](tracing/current-feature-logic.md)
+- [追加Trace機能の候補・優先度・実装時の条件（Issue #43）](tracing/trace-feature-candidates.md)
+
+以下は機能別の調査・変更記録です。初期実装時の仕様は上記の現行まとめと区別して参照してください。
+
 - [入力保存とフォルダードロップ（Issue #16）](input-assistance.md)
 - [CPU 対象の絞り込みと数量 ADD（Issue #18・#21）](tracing/focused-cpu-and-quantity-counters.md)
 - [変更プレビュー・選択・インデント・数量推奨（Issue #23・#24・#25）](tracing/preview-selection-and-indentation.md)

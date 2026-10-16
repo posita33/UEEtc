@@ -19,6 +19,8 @@ CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とST
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
+[現行2機能の付与ロジックとEngine参照](wiki/tracing/current-feature-logic.md)、[追加Trace機能の候補と優先度](wiki/tracing/trace-feature-candidates.md)に、実装根拠と今後の検討内容をまとめています。
+
 ## 開発環境
 
 - Windows（WPF のビルド・実行に必要）
