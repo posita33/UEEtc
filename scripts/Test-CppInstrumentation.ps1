@@ -3,13 +3,17 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $fixtureRoot = Join-Path $repoRoot ('artifacts/cpp-smoke/' + [guid]::NewGuid().ToString('N'))
 $sourceDir = Join-Path $fixtureRoot 'source'
-$reportDir = Join-Path $fixtureRoot 'report'
 $stubDir = Join-Path $fixtureRoot 'stubs'
 New-Item -ItemType Directory -Path $sourceDir, (Join-Path $stubDir 'ProfilingDebugging') -Force | Out-Null
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText((Join-Path $sourceDir 'Fixture.cpp'), @'
 #include "Fixture.h"
 #include "UnityPart.cpp"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "ProfilingDebugging/CountersTrace.h"
+TRACE_DECLARE_ATOMIC_INT_COUNTER(ExistingCalls, TEXT("Existing entry count"));
+void ExistingCpu() { TRACE_CPUPROFILER_EVENT_SCOPE_STR("Existing CPU"); ++WorkDone; }
+void ExistingCounter() { TRACE_COUNTER_INCREMENT(ExistingCalls); ++WorkDone; }
 void FUnity::A_Work() { ++WorkDone; }
 void FFixture::Work() {
     auto raw = R"tag({ " not a function })tag";
@@ -32,12 +36,12 @@ int main() {
     if (fixture.Value(1) != 1001 || fixture.Value(2.0f) != 2) return 1;
     A::Work(); B::Work(); Conditional();
     FUnity::A_Work(); FUnity_A::Work();
-    if (WorkDone != 6) return 2;
-#if TRACE_TEST_ENABLED
-    if (CounterEntries != 9 || ScopeEntries != 9 || ScopeExits != 8) return 3;
-#else
-    if (CounterEntries != 0 || ScopeEntries != 0 || ScopeExits != 0) return 4;
-#endif
+    ExistingCpu(); ExistingCounter();
+    if (WorkDone != 8) return 2;
+    const int ExpectedScopes = TEST_CPU_ENABLED ? (TRACE_TEST_MODE == 1 ? 1 : 11) : 0;
+    const int ExpectedCounters = TEST_COUNTER_ENABLED ? (TRACE_TEST_MODE == 0 ? 1 : 11) : 0;
+    const int ExpectedScopeExits = ExpectedScopes - (TEST_CPU_ENABLED && TRACE_TEST_MODE != 1 ? 1 : 0);
+    if (CounterEntries != ExpectedCounters || ScopeEntries != ExpectedScopes || ScopeExits != ExpectedScopeExits) return 3;
     return 0;
 }
 '@, $utf8)
@@ -67,7 +71,7 @@ class FUnity_A { public: static void Work(); };
 # They are not substitutes for a build using Unreal's actual toolchain and headers.
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'ProfilingDebugging/CpuProfilerTrace.h'), @'
 #pragma once
-#if TRACE_TEST_ENABLED
+#if TEST_CPU_ENABLED
 struct TestScope { TestScope() { ++ScopeEntries; } ~TestScope() { ++ScopeExits; } };
 #define TRACE_CPUPROFILER_EVENT_SCOPE_STR(Name) TestScope TestScopeInstance;
 #else
@@ -76,7 +80,7 @@ struct TestScope { TestScope() { ++ScopeEntries; } ~TestScope() { ++ScopeExits; 
 '@, $utf8)
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'ProfilingDebugging/CountersTrace.h'), @'
 #pragma once
-#if TRACE_TEST_ENABLED
+#if TEST_COUNTER_ENABLED
 struct TestCounter {
     std::atomic<long long> Value{0};
     explicit TestCounter(const wchar_t*) {}
@@ -89,20 +93,28 @@ struct TestCounter {
 #define TRACE_COUNTER_INCREMENT(Name)
 #endif
 '@, $utf8)
-dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release -- $sourceDir --report $reportDir
-if ($LASTEXITCODE -ne 0) { throw 'Fixture instrumentation failed.' }
+dotnet build (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release
+if ($LASTEXITCODE -ne 0) { throw 'Console build failed.' }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vsPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vsPath) { throw 'MSVC C++ build tools were not found.' }
 Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
 Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-foreach ($enabled in @(0, 1)) {
-    $objectPath = Join-Path $fixtureRoot "fixture-$enabled.obj"
-    $exePath = Join-Path $fixtureRoot "fixture-$enabled.exe"
-    & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTRACE_TEST_ENABLED=$enabled" "/I$stubDir" "/Fo$objectPath" "/Fe$exePath" (Join-Path $reportDir 'modified/Fixture.cpp')
-    if ($LASTEXITCODE -ne 0) { throw "C++ compilation failed (trace=$enabled)." }
-    & $exePath
-    if ($LASTEXITCODE -ne 0) { throw "C++ runtime assertions failed (trace=$enabled, exit=$LASTEXITCODE)." }
-    Write-Output "C++ compile/runtime PASS (trace=$enabled)"
+foreach ($mode in @(@{Name='cpu'; Number=0; Flags=@()}, @{Name='counter'; Number=1; Flags=@('--counter-only')}, @{Name='both'; Number=2; Flags=@('--both')})) {
+    $reportDir = Join-Path $fixtureRoot ('report-' + $mode.Name)
+    $flags = $mode.Flags
+    dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release --no-build -- $sourceDir @flags --report $reportDir
+    if ($LASTEXITCODE -ne 0) { throw 'Fixture instrumentation failed.' }
+    foreach ($traceFlags in @(@{Cpu=0; Counter=0}, @{Cpu=1; Counter=0}, @{Cpu=0; Counter=1}, @{Cpu=1; Counter=1})) {
+        $tag = "$($mode.Name)-cpu$($traceFlags.Cpu)-counter$($traceFlags.Counter)"
+        $objectPath = Join-Path $fixtureRoot "fixture-$tag.obj"
+        $exePath = Join-Path $fixtureRoot "fixture-$tag.exe"
+        $enabled = $traceFlags.Cpu -bor $traceFlags.Counter
+        & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTRACE_TEST_ENABLED=$enabled" "/DTEST_CPU_ENABLED=$($traceFlags.Cpu)" "/DTEST_COUNTER_ENABLED=$($traceFlags.Counter)" "/DTRACE_TEST_MODE=$($mode.Number)" "/I$stubDir" "/Fo$objectPath" "/Fe$exePath" (Join-Path $reportDir 'modified/Fixture.cpp')
+        if ($LASTEXITCODE -ne 0) { throw "C++ compilation failed ($tag)." }
+        & $exePath
+        if ($LASTEXITCODE -ne 0) { throw "C++ runtime assertions failed ($tag, exit=$LASTEXITCODE)." }
+        Write-Output "C++ compile/runtime PASS ($tag)"
+    }
 }
 Write-Output "Artifacts: $fixtureRoot"

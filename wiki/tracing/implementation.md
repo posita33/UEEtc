@@ -37,6 +37,8 @@ scripts/
 
 ## 挿入するコード
 
+標準では CPU スコープだけを追加します。以下は `--both` または WPF で両方を選択した場合の例です。追加する種類と既存計測の扱いは [独立した付与条件](independent-trace-policy.md) に記載しています。
+
 生成形式を示すための独自の短いサンプルです。通常のカウンター識別子は `<namespace・クラス名・関数名>_CallCount` です。`AExample::Work` は `AExample_Work_CallCount` となります。全候補の基本名と既存の識別子を照合し、衝突する場合だけパス・シグネチャ由来の SHA-256 の先頭 16 桁を付けます。固定の `UEEtcCalls_` 接頭辞は付けません。詳細と実測結果は [命名調査](counter-naming.md) を参照してください。
 
 例: `Source/Example/Example.cpp`
@@ -72,7 +74,7 @@ UE 5.8 の `TRACE_DECLARE_ATOMIC_INT_COUNTER` は最終的に `FCountersTrace::F
 
 カウンターの値が関数呼び出しごとに初期化されないのは、関数外で定義した変数に静的記憶域期間があるためです。無名 namespace にその役割があるわけではありません。atomic 版は、複数スレッドからの increment で値のデータ競合を避けるために使います。
 
-以前の名前で計測済みの関数は、既存計測をスキップするため自動では改名しません。新しい名前を試す場合は、未加工のソースからプレビュー・加工済みコピーを再生成してください。衝突回避の範囲は選択したフォルダー内です。別フォルダーで個別に解析したファイルを後から同じ Unity Build に混ぜるときは、共通の親からまとめて解析してください。
+以前の名前で計測済みの種類は維持し、自動では改名しません。新しい名前を試す場合は、未加工のソースからプレビュー・加工済みコピーを再生成してください。衝突回避の範囲は選択したフォルダー内です。別フォルダーで個別に解析したファイルを後から同じ Unity Build に混ぜるときは、共通の親からまとめて解析してください。
 
 ## WPF
 
@@ -84,7 +86,7 @@ dotnet run --project src/UEEtc.Wpf
 ```
 
 1. Source フォルダーのフルパスを入力するか「フォルダーを選択」で指定します。
-2. CPU スコープと関数進入回数のうち必要なものを選び、「解析・プレビュー」を押します。
+2. 標準は「CPU スコープ（時間）」だけがオンです。「関数進入回数（任意）」は必要な場合だけ選択し、「解析・プレビュー」を押します。
 3. 左のファイル一覧から選択し、「付与後プレビュー」「付与前」「関数・除外理由」「診断」を確認します。ファイル名にマウスを合わせると相対パスを表示します。
 4. 「レポートを保存」で対象ソースの親・子ではない空のフォルダーに出力できます。元ソースは変わりません。
 5. 実際に変更したい段階で「元ファイルへ適用」を選びます。ファイル数と対象パスを表示する確認画面の後にバックアップを作成し、元ファイルを更新します。
@@ -104,11 +106,17 @@ dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBrea
 # 対象外の空フォルダーにレポートと加工済みコピーを保存
 dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/Temp/UEEtc-BlockBreaker-Preview"
 
-# 片方だけの付与を試す。--counter-only も使用可能
+# 明示的に時間のみ。標準と同じ
 dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBreaker/Source" --cpu-only
+
+# 進入回数のみ
+dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBreaker/Source" --counter-only
+
+# 時間と進入回数の両方
+dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBreaker/Source" --both
 ```
 
-`--apply` を追加すると実際の元ファイルに適用します。明示的に書き換えるためのオプションであり、今回の実プロジェクト実験では付けていません。`--cpu-only` と `--counter-only` は排他的で、どちらも指定しなければ両方が対象です。
+`--apply` を追加すると実際の元ファイルに適用します。明示的に書き換えるためのオプションであり、今回の実プロジェクト実験では付けていません。`--cpu-only`、`--counter-only`、`--both` は排他的で、いずれも指定しなければ CPU のみが対象です。
 
 | 終了コード | 意味 |
 | --- | --- |
@@ -123,7 +131,7 @@ dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBrea
 
 | 出力 | 内容 |
 | --- | --- |
-| `report.json` | 対象パス、オプション、件数、各関数の名前・元行番号・判定理由・カウンター名 |
+| `report.json` | 対象パス、オプション、件数、各関数の名前・元行番号・CPU / Counter ごとの追加有無と判定理由・追加カウンター名 |
 | `changes.patch` | ファイル全体をコンテキストとする unified diff。レビュー用で省略なし |
 | `modified/` | 変更案のある `.cpp` だけを相対パスを保って保存したコピー |
 
@@ -161,6 +169,6 @@ Core / WPF テストの適用検証はテスト専用の一時フォルダーだ
 ## 制限と次の拡張
 
 - 完全な C++ パーサーではないため、全関数への網羅性や任意の入力に対する UE コンパイル成功を保証しません。詳細な除外条件は [調査](engine-research.md) を参照してください。
-- 関数ごとの選択・除外リスト、重い関数だけへの絞り込み、既存計測の片方補完は未実装です。
+- 関数ごとの選択・除外リスト、重い関数だけへの絞り込みは未実装です。既存の種類は維持し、選択したもう一方が未計測なら補完できます。ただし既存カウンターの意味は推定しません。
 - 広範囲に入れると計測自体の負荷、カウンターやイベント定義の数が増えます。大きな範囲では CPU のみ、または対象フォルダーを絞って確認できます。
 - ヘッダー内 inline 定義、テンプレート、コンストラクターを扱う拡張には、UE のコンパイルデータを使う AST 解析の導入を検討します。

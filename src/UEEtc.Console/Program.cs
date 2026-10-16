@@ -7,8 +7,10 @@ static int Run(string[] arguments)
     if (arguments.Length == 0 || arguments is ["--help"] or ["-h"])
     {
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
-        Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only] [--report <output-full-path>] [--apply]");
-        Console.WriteLine("Default: preview only. --report exports JSON, a review patch and modified copies.");
+        Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only | --both] [--report <output-full-path>] [--apply]");
+        Console.WriteLine("Default: CPU scopes only, preview only. Counters are optional function entry counts, not success/hit counts.");
+        Console.WriteLine("--both opts into CPU scopes and entry counters. Existing tracing is preserved independently by kind.");
+        Console.WriteLine("--report exports JSON, a review patch and modified copies.");
         Console.WriteLine("--apply writes source files after validating the preview and creating backups.");
         return 0;
     }
@@ -30,6 +32,8 @@ static int Run(string[] arguments)
                     options = new(true, false); modeChosen = true; break;
                 case "--counter-only" when !modeChosen:
                     options = new(false, true); modeChosen = true; break;
+                case "--both" when !modeChosen:
+                    options = new(true, true); modeChosen = true; break;
                 case "--report" when i + 1 < arguments.Length && report is null:
                     report = arguments[++i]; break;
                 case "--apply" when !apply:

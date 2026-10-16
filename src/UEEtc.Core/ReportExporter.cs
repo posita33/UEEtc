@@ -63,7 +63,7 @@ public static class ReportExporter
     }
 
     public static string Summary(AnalysisPlan plan) =>
-        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 関数付与 / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断";
+        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 関数付与（CPU {plan.AddedCpuScopes} / 進入回数 {plan.AddedCallCounters}） / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断";
 
     private static string[] Lines(string text) => text.Length == 0 ? [] :
         (text.EndsWith('\n') ? text[..^1] : text).Split('\n');

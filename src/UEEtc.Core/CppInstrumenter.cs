@@ -25,6 +25,8 @@ public sealed class CppInstrumenter
             var edits = new List<(int Position, string Text)>();
             var counters = new List<string>();
             var pendingCounters = new Dictionary<string, string>(StringComparer.Ordinal);
+            bool needsCpuHeader = false;
+            bool needsCounterHeader = false;
             string newline = document.Text.Contains("\r\n") ? "\r\n" : "\n";
             // Keep the own header first, and declare counters after headers that define their macros.
             int firstCode = tokens.Count > 0 ? tokens[0].Start : document.Text.Length;
@@ -35,9 +37,9 @@ public sealed class CppInstrumenter
             if (edits.Count > 0)
             {
                 string declarations = "";
-                if (options.CpuScopes && !Includes(includes, "CpuProfilerTrace.h"))
+                if (needsCpuHeader && !Includes(includes, "CpuProfilerTrace.h"))
                     declarations += "#include \"ProfilingDebugging/CpuProfilerTrace.h\"" + newline;
-                if (options.CallCounters && !Includes(includes, "CountersTrace.h"))
+                if (needsCounterHeader && !Includes(includes, "CountersTrace.h"))
                     declarations += "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
                 if (counters.Count > 0)
                     declarations += newline + "// UEEtc: cumulative function entry counters" + newline +
@@ -96,10 +98,6 @@ public sealed class CppInstrumenter
                     header.Skip(paren).Any(t => t.Text is "->" or ":"))
                     reason = "特殊な宣言構文は手動確認";
                 else if (body.Count == 0) reason = "空の関数";
-                else if (body.Any(t => !t.Literal && (t.Text.StartsWith("TRACE_CPUPROFILER", StringComparison.Ordinal) ||
-                    t.Text.StartsWith("TRACE_COUNTER_", StringComparison.Ordinal) ||
-                    t.Text.Contains("SCOPE_CYCLE_COUNTER", StringComparison.Ordinal) || t.Text == "SCOPED_NAMED_EVENT")))
-                    reason = "既存の CPU 計測／カウンターあり（重複を避ける）";
                 else if (body.Any(t => t.Text is "co_await" or "co_yield" or "co_return"))
                     reason = "コルーチンのスコープ寿命は手動確認";
                 else if (anchor is null) reason = "無条件の #include がなく挿入位置を確定できない";
@@ -107,7 +105,24 @@ public sealed class CppInstrumenter
                 else if (!options.CpuScopes && !options.CallCounters) reason = "付与するマクロが未選択";
                 if (reason is not null)
                 {
-                    functions.Add(new(name, line, "Skip", reason));
+                    functions.Add(new(name, line, "Skip", reason)
+                    {
+                        CpuDecision = options.CpuScopes ? reason : "未選択",
+                        CounterDecision = options.CallCounters ? reason : "未選択"
+                    });
+                    return;
+                }
+                bool existingCpu = HasCall(t => t.StartsWith("TRACE_CPUPROFILER", StringComparison.Ordinal) ||
+                    t.Contains("SCOPE_CYCLE_COUNTER", StringComparison.Ordinal) || t.StartsWith("SCOPED_NAMED_EVENT", StringComparison.Ordinal));
+                bool existingCounter = HasCall(t => t.StartsWith("TRACE_COUNTER_", StringComparison.Ordinal));
+                bool addCpu = options.CpuScopes && !existingCpu;
+                bool addCounter = options.CallCounters && !existingCounter;
+                string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" : "追加：関数全体の時間";
+                string counterDecision = !options.CallCounters ? "未選択" : existingCounter ? "既存のカウンター操作を維持（意味は自動推定しない）" : "追加：関数進入回数（成功・命中数ではない）";
+                string decisions = "CPU: " + cpuDecision + " / Counter: " + counterDecision;
+                if (!addCpu && !addCounter)
+                {
+                    functions.Add(new(name, line, "Skip", decisions) { CpuDecision = cpuDecision, CounterDecision = counterDecision });
                     return;
                 }
                 string signature = namespaceName + string.Join(" ", header.Select(t => t.Text));
@@ -115,7 +130,8 @@ public sealed class CppInstrumenter
                 string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))[..16];
                 string label = "UEEtc/" + relativePath.Replace('\\', '/') + "/" + namespaceName + name + " [" + hash + "]";
                 // Resolve names together across the selected source tree after candidate discovery.
-                if (!pendingCounters.TryGetValue(identity, out string? counter))
+                string? counter = null;
+                if (addCounter && !pendingCounters.TryGetValue(identity, out counter))
                 {
                     counter = "UEEtcPendingCounter_" + pendingCounters.Count;
                     while (document.Text.Contains(counter, StringComparison.Ordinal)) counter += "_";
@@ -123,21 +139,34 @@ public sealed class CppInstrumenter
                 }
                 string indent = Indent(document.Text, tokens[open].Start) + "\t";
                 string insert = newline + indent + "// UEEtc: function entry" + newline;
-                if (options.CpuScopes)
-                    insert += indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(label) + "\");" + newline;
-                if (options.CallCounters)
+                if (addCpu)
                 {
+                    needsCpuHeader = true;
+                    insert += indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(label) + "\");" + newline;
+                }
+                if (addCounter)
+                {
+                    needsCounterHeader = true;
                     string declaration = "\tTRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + "/Calls") + "\"));";
                     if (!counters.Contains(declaration)) counters.Add(declaration);
                     insert += indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline;
                 }
                 // Existing bytes after the brace are left intact, including one-line functions.
                 edits.Add((tokens[open].End, insert));
-                functions.Add(new(name, line, "Add", "関数全体の時間／関数進入回数", options.CallCounters ? counter : null)
+                functions.Add(new(name, line, "Add", decisions, counter)
                 {
+                    CpuScopeAdded = addCpu, CallCounterAdded = addCounter,
+                    CpuDecision = cpuDecision, CounterDecision = counterDecision,
                     CounterBaseName = CounterNaming.BaseName(namespaceName, name),
                     CounterIdentity = identity, CounterHash = hash
                 });
+
+                bool HasCall(Func<string, bool> predicate)
+                {
+                    for (int i = 0; i + 1 < body.Count; i++)
+                        if (!body[i].Literal && body[i + 1].Text == "(" && predicate(body[i].Text)) return true;
+                    return false;
+                }
             }
         }
         catch (Exception exception) when (exception is InvalidDataException or DecoderFallbackException)
