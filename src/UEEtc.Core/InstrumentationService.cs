@@ -21,9 +21,12 @@ public sealed class InstrumentationService
             throw new ArgumentException("CPU スコープまたは進入回数カウンターを選択してください。");
         var files = new List<FileAnalysis>();
         var diagnostics = new List<string>();
+        var reservedNames = new HashSet<string>(StringComparer.Ordinal);
         var instrumenter = new CppInstrumenter();
         Walk(root);
-        return new(root, options, files, diagnostics);
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report("カウンター名の衝突を確認中");
+        return new(root, options, CounterNaming.Resolve(files, reservedNames, cancellationToken), diagnostics);
 
         void Walk(string directory)
         {
@@ -51,14 +54,22 @@ public sealed class InstrumentationService
                         if (!ExcludedDirectories.Contains(Path.GetFileName(entry))) Walk(entry);
                         continue;
                     }
-                    if (!Path.GetExtension(entry).Equals(".cpp", StringComparison.OrdinalIgnoreCase) ||
+                    string extension = Path.GetExtension(entry).ToLowerInvariant();
+                    if (options.CallCounters && extension is ".h" or ".hpp" or ".inl" or ".cc" or ".cxx")
+                    {
+                        string text = SourceDocument.Read(File.ReadAllBytes(entry)).Text;
+                        reservedNames.UnionWith(CounterNaming.Identifiers(text));
+                    }
+                    if (extension != ".cpp" ||
                         entry.EndsWith(".gen.cpp", StringComparison.OrdinalIgnoreCase) ||
                         entry.EndsWith(".generated.cpp", StringComparison.OrdinalIgnoreCase)) continue;
                     string relative = Path.GetRelativePath(root, entry).Replace('\\', '/');
                     progress?.Report(relative);
-                    files.Add(instrumenter.Analyze(relative, File.ReadAllBytes(entry), options));
+                    var analysis = instrumenter.AnalyzeUnresolved(relative, File.ReadAllBytes(entry), options);
+                    files.Add(analysis);
+                    if (options.CallCounters) reservedNames.UnionWith(CounterNaming.Identifiers(analysis.OriginalText));
                 }
-                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.DecoderFallbackException)
                 {
                     diagnostics.Add($"{entry}: {error.Message}");
                 }

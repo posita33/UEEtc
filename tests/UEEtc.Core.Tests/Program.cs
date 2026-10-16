@@ -56,6 +56,90 @@ var tests = new (string Name, Action Run)[]
         Equal(4, file.AddedFunctions);
         Equal(4, file.Functions.Select(f => f.Counter).Distinct().Count());
     }),
+    ("Counter identifiers show class and function in declaration, increment and report", () =>
+    {
+        var file = Analyze("void ABlockBreakerGameMode::BeginPlay() { Run(); }");
+        string counter = file.Functions.Single().Counter!;
+        Equal("ABlockBreakerGameMode_BeginPlay_CallCount", counter);
+        Contains(file.ProposedText, "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ",");
+        Contains(file.ProposedText, "TRACE_COUNTER_INCREMENT(" + counter + ");");
+        Assert(System.Text.RegularExpressions.Regex.IsMatch(counter, @"^[A-Za-z][A-Za-z0-9_]*$"));
+    }),
+    ("Readable counter names avoid reserved double underscores", () =>
+    {
+        const string body = "#include \"Fixture.h\"\nvoid F::_Work_Impl() { Run(); }";
+        var instrumenter = new CppInstrumenter();
+        var first = instrumenter.Analyze("ModuleA/Fixture.cpp", Encoding.UTF8.GetBytes(body), new());
+        var second = instrumenter.Analyze("ModuleB/Fixture.cpp", Encoding.UTF8.GetBytes(body), new());
+        string name = first.Functions.Single().Counter!;
+        Equal("F_Work_Impl_CallCount", name);
+        Assert(!name.Contains("__", StringComparison.Ordinal));
+        // Standalone analysis resolves only this file; whole-tree analysis handles cross-file collisions.
+        Equal(name, second.Functions.Single().Counter);
+    }),
+    ("Only overloaded candidates receive hash suffixes", () =>
+    {
+        var file = Analyze("void F::Work(int a) { Run(); }\nvoid F::Work(float a) { Run(); }\nvoid F::Other() { Run(); }");
+        var overloads = file.Functions.Where(f => f.Name == "F::Work").ToArray();
+        Equal(2, overloads.Length);
+        Assert(overloads.All(f => System.Text.RegularExpressions.Regex.IsMatch(f.Counter!, @"^F_Work_CallCount_[0-9A-F]{16}$")));
+        Equal("F_Other_CallCount", file.Functions.Single(f => f.Name == "F::Other").Counter);
+        Assert(overloads.All(f => f.Reason.Contains("衝突")));
+    }),
+    ("Namespaces contribute readable names without unnecessary hashes", () =>
+    {
+        var file = Analyze("namespace A { void Work() { Run(); } } namespace B { void Work() { Run(); } }");
+        Equal("A_Work_CallCount", file.Functions[0].Counter);
+        Equal("B_Work_CallCount", file.Functions[1].Counter);
+    }),
+    ("Normalized scoped names that collide remain independent", () =>
+    {
+        var file = Analyze("void A_B::Work() { Run(); }\nvoid A::B_Work() { Run(); }");
+        Equal(2, file.Functions.Select(f => f.Counter).Distinct().Count());
+        Assert(file.Functions.All(f => f.Counter!.StartsWith("A_B_Work_CallCount_", StringComparison.Ordinal)));
+    }),
+    ("Whole-tree naming avoids collisions across files deterministically", () => WithTemporaryRoot(root =>
+    {
+        Write(root, "B.cpp", "#include \"Fixture.h\"\nvoid A::B_Work() { Run(); }");
+        Write(root, "A.cpp", "#include \"Fixture.h\"\nvoid A_B::Work() { Run(); }");
+        var service = new InstrumentationService();
+        var first = service.Analyze(root);
+        var second = service.Analyze(root);
+        var counters = first.Files.SelectMany(f => f.Functions).Select(f => f.Counter).ToArray();
+        Equal(2, counters.Distinct().Count());
+        Assert(counters.All(c => c!.StartsWith("A_B_Work_CallCount_", StringComparison.Ordinal)));
+        Equal(string.Join(",", counters), string.Join(",", second.Files.SelectMany(f => f.Functions).Select(f => f.Counter)));
+        Assert(first.Files.All(f => !f.ProposedText.Contains("UEEtcPendingCounter_")));
+        service.Apply(first);
+        Equal(0, service.Analyze(root).ChangedFiles);
+    })),
+    ("Existing names and macro-expanded variable names in headers are reserved", () => WithTemporaryRoot(root =>
+    {
+        Write(root, "Work.cpp", "#include \"Fixture.h\"\nvoid F::Work() { Run(); }\nvoid F::Other() { Run(); }");
+        Write(root, "Fixture.h", "TRACE_DECLARE_ATOMIC_INT_COUNTER(F_Work_CallCount, TEXT(\"Existing\"));\nint __GTraceCounterF_Other_CallCount;");
+        var plan = new InstrumentationService().Analyze(root);
+        Assert(plan.Files.Single().Functions.All(f => f.Counter!.Contains("_CallCount_", StringComparison.Ordinal)));
+        Contains(File.ReadAllText(Path.Combine(root, "Fixture.h")), "F_Work_CallCount,");
+    })),
+    ("Reserved fallback names receive a further deterministic suffix", () => WithTemporaryRoot(root =>
+    {
+        const string source = "#include \"Fixture.h\"\nvoid Work(int a) { Run(); }\nvoid Work(float a) { Run(); }";
+        var original = new CppInstrumenter().Analyze("Work.cpp", Encoding.UTF8.GetBytes(source), new());
+        string reserved = original.Functions[0].Counter!;
+        Write(root, "Work.cpp", source);
+        Write(root, "Fixture.hpp", "int __GTraceCounter" + reserved + ";");
+        var plan = new InstrumentationService().Analyze(root);
+        Equal(reserved + "_2", plan.Files.Single().Functions[0].Counter);
+    })),
+    ("Intentional repeated increments preserve one existing shared counter", () =>
+    {
+        const string body = "TRACE_DECLARE_ATOMIC_INT_COUNTER(SharedHits, TEXT(\"Hits\"));\nvoid One() { TRACE_COUNTER_INCREMENT(SharedHits); }\nvoid Two() { TRACE_COUNTER_INCREMENT(SharedHits); }\nvoid NewWork() { Run(); }";
+        var file = Analyze(body);
+        Equal(1, file.AddedFunctions);
+        Equal(2, Occurrences(file.ProposedText, "TRACE_COUNTER_INCREMENT(SharedHits)"));
+        Equal(1, Occurrences(file.ProposedText, "TRACE_DECLARE_ATOMIC_INT_COUNTER(SharedHits,"));
+        Contains(file.ProposedText, "TRACE_COUNTER_INCREMENT(NewWork_CallCount)");
+    }),
     ("Alternate conditional definitions share a single declaration", () =>
     {
         var file = Analyze("#if A\nvoid Work() { RunA(); }\n#else\nvoid Work() { RunB(); }\n#endif\n");

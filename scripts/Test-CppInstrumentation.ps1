@@ -9,6 +9,8 @@ New-Item -ItemType Directory -Path $sourceDir, (Join-Path $stubDir 'ProfilingDeb
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText((Join-Path $sourceDir 'Fixture.cpp'), @'
 #include "Fixture.h"
+#include "UnityPart.cpp"
+void FUnity::A_Work() { ++WorkDone; }
 void FFixture::Work() {
     auto raw = R"tag({ " not a function })tag";
     (void)raw;
@@ -29,14 +31,19 @@ int main() {
     fixture.Work();
     if (fixture.Value(1) != 1001 || fixture.Value(2.0f) != 2) return 1;
     A::Work(); B::Work(); Conditional();
-    if (WorkDone != 4) return 2;
+    FUnity::A_Work(); FUnity_A::Work();
+    if (WorkDone != 6) return 2;
 #if TRACE_TEST_ENABLED
-    if (CounterEntries != 7 || ScopeEntries != 7 || ScopeExits != 6) return 3;
+    if (CounterEntries != 9 || ScopeEntries != 9 || ScopeExits != 8) return 3;
 #else
     if (CounterEntries != 0 || ScopeEntries != 0 || ScopeExits != 0) return 4;
 #endif
     return 0;
 }
+'@, $utf8)
+[System.IO.File]::WriteAllText((Join-Path $sourceDir 'UnityPart.cpp'), @'
+#include "Fixture.h"
+void FUnity_A::Work() { ++WorkDone; }
 '@, $utf8)
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'Fixture.h'), @'
 #pragma once
@@ -53,6 +60,8 @@ public:
     int Value(int v) const;
     int Value(float v) const;
 };
+class FUnity { public: static void A_Work(); };
+class FUnity_A { public: static void Work(); };
 '@, $utf8)
 # These stubs check generated placement and lifetime with both enabled/disabled macro expansions.
 # They are not substitutes for a build using Unreal's actual toolchain and headers.

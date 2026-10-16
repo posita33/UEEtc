@@ -8,6 +8,12 @@ public sealed class CppInstrumenter
 {
     public FileAnalysis Analyze(string relativePath, byte[] bytes, InstrumentationOptions options)
     {
+        var file = AnalyzeUnresolved(relativePath, bytes, options);
+        return CounterNaming.Resolve([file], CounterNaming.Identifiers(file.OriginalText))[0];
+    }
+
+    internal FileAnalysis AnalyzeUnresolved(string relativePath, byte[] bytes, InstrumentationOptions options)
+    {
         var functions = new List<FunctionAnalysis>();
         var diagnostics = new List<string>();
         try
@@ -18,6 +24,7 @@ public sealed class CppInstrumenter
             var matches = MatchBraces(tokens);
             var edits = new List<(int Position, string Text)>();
             var counters = new List<string>();
+            var pendingCounters = new Dictionary<string, string>(StringComparer.Ordinal);
             string newline = document.Text.Contains("\r\n") ? "\r\n" : "\n";
             // Keep the own header first, and declare counters after headers that define their macros.
             int firstCode = tokens.Count > 0 ? tokens[0].Start : document.Text.Length;
@@ -104,9 +111,16 @@ public sealed class CppInstrumenter
                     return;
                 }
                 string signature = namespaceName + string.Join(" ", header.Select(t => t.Text));
-                string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(relativePath.Replace('\\', '/') + "|" + signature)))[..16];
+                string identity = relativePath.Replace('\\', '/') + "|" + signature;
+                string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))[..16];
                 string label = "UEEtc/" + relativePath.Replace('\\', '/') + "/" + namespaceName + name + " [" + hash + "]";
-                string counter = "UEEtcCalls_" + hash;
+                // Resolve names together across the selected source tree after candidate discovery.
+                if (!pendingCounters.TryGetValue(identity, out string? counter))
+                {
+                    counter = "UEEtcPendingCounter_" + pendingCounters.Count;
+                    while (document.Text.Contains(counter, StringComparison.Ordinal)) counter += "_";
+                    pendingCounters.Add(identity, counter);
+                }
                 string indent = Indent(document.Text, tokens[open].Start) + "\t";
                 string insert = newline + indent + "// UEEtc: function entry" + newline;
                 if (options.CpuScopes)
@@ -119,7 +133,11 @@ public sealed class CppInstrumenter
                 }
                 // Existing bytes after the brace are left intact, including one-line functions.
                 edits.Add((tokens[open].End, insert));
-                functions.Add(new(name, line, "Add", "関数全体の時間／関数進入回数", options.CallCounters ? counter : null));
+                functions.Add(new(name, line, "Add", "関数全体の時間／関数進入回数", options.CallCounters ? counter : null)
+                {
+                    CounterBaseName = CounterNaming.BaseName(namespaceName, name),
+                    CounterIdentity = identity, CounterHash = hash
+                });
             }
         }
         catch (Exception exception) when (exception is InvalidDataException or DecoderFallbackException)

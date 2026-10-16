@@ -40,7 +40,7 @@ status: todo
 | 同上 | 245 行付近、288–317 行 | 通常の整数型と atomic 整数型、それぞれの宣言マクロを提供する |
 | 同上 | 399 行、445 行以降 | increment は宣言済みオブジェクトを参照し、無効時は宣言・更新とも空に展開される |
 
-したがって `TRACE_COUNTER_INCREMENT(SomeCounter)` だけを挿入しても動きません。対応するカウンター宣言と `CountersTrace.h` が必要です。本実装ではファイルごとの無名 namespace に `TRACE_DECLARE_ATOMIC_INT_COUNTER` を置き、関数本体の先頭で increment します。UE の unity build で名前が衝突しにくいよう、識別子にはファイル相対パスとシグネチャ由来のハッシュを付けます。
+したがって `TRACE_COUNTER_INCREMENT(SomeCounter)` だけを挿入しても動きません。対応するカウンター宣言と `CountersTrace.h` が必要です。本実装ではファイルごとの無名 namespace に `TRACE_DECLARE_ATOMIC_INT_COUNTER` を置き、関数本体の先頭で increment します。識別子は通常 `<namespace・クラス名・関数名>_CallCount` とし、全候補や既存の識別子と衝突する場合だけ、ファイル相対パスとシグネチャ由来のハッシュを末尾に付けます。Engine における名前の再利用は [命名調査](counter-naming.md)、無名 namespace の役割と限界は [実装ノート](implementation.md#無名-namespace-の理由) に記載しています。
 
 atomic 版を選ぶのは、任意の関数が Game Thread だけで動くとは判断できないためです。値の更新時のデータ競合を避けますが、競合する各スレッドからの出力順序まで保証するものではありません。
 
