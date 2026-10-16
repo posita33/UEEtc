@@ -112,6 +112,25 @@ internal static class WorkflowTests
             check(!((Expander)events.FindName("AdvancedOptions")).IsExpanded, "Manual settings are optional and collapsed");
             check(File.ReadAllText(Path.Combine(source, "Batch.cpp")) == batch, "Analyze does not write automatic proposals into source");
             if (screenshots is not null) Program.Screenshot(events, Path.Combine(screenshots, "automatic-counters.png"), 1280, 900);
+
+            string longFile = "#include \"Fixture.h\"\nvoid F::Many(uint32 NumBytes)\n{\n" +
+                string.Join("\n", Enumerable.Range(0, 150).Select(i => $"    if (Flag{i}) {{ Process{i}(); }}")) + "\n}\n// END_OF_LONG_SOURCE";
+            File.WriteAllText(Path.Combine(source, "Batch.cpp"), longFile);
+            Click(events, "AnalyzeButton"); Until(() => !events.IsBusy); events.UpdateLayout(); Pump();
+            var summaryScroll = (ScrollViewer)events.FindName("PreviewSummaryScroll");
+            check(summaryScroll.ScrollableHeight > 0, "Many-candidate explanation has a usable vertical scroll range");
+            summaryScroll.ScrollToBottom(); Pump(); events.UpdateLayout();
+            check(Math.Abs(summaryScroll.VerticalOffset - summaryScroll.ScrollableHeight) < 1, "Explanation scroll reaches its final candidate");
+            var editor = (RichTextBox)eventPreview.FindName("Editor"); editor.ScrollToEnd(); Pump(); events.UpdateLayout();
+            check(editor.VerticalOffset > 0 && editor.ExtentHeight - editor.ViewportHeight - editor.VerticalOffset < 1, "Long source scroll reaches its final line");
+            check(eventPreview.Text.EndsWith("END_OF_LONG_SOURCE", StringComparison.Ordinal), "Long preview retains the complete source");
+            var lastLine = editor.Document.Blocks.LastBlock.ContentEnd.GetCharacterRect(LogicalDirection.Backward);
+            check(lastLine.Bottom <= editor.ActualHeight && lastLine.Top >= 0, "Final source line is inside the visible editor");
+            events.Height = 720; events.UpdateLayout(); Pump(); editor.ScrollToEnd(); summaryScroll.ScrollToBottom(); Pump(); events.UpdateLayout();
+            lastLine = editor.Document.Blocks.LastBlock.ContentEnd.GetCharacterRect(LogicalDirection.Backward);
+            check(editor.ViewportHeight > 0 && lastLine.Bottom <= editor.ActualHeight && lastLine.Top >= 0, "Final source line remains reachable at minimum window height");
+            if (screenshots is not null) Program.Screenshot(events, Path.Combine(screenshots, "long-preview-bottom.png"), 1280, 720,
+                () => { editor.ScrollToEnd(); summaryScroll.ScrollToBottom(); });
         }
         finally { cpu.Close(); events.Close(); }
     }

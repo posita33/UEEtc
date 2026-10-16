@@ -161,9 +161,10 @@ internal static class Program
         }
         Assert(action.IsEnabled, "Operation completed within timeout");
     }
-    internal static void Screenshot(Window window, string path, int width, int height)
+    internal static void Screenshot(Window window, string path, int width, int height, Action? beforeRender = null)
     {
         var content = (FrameworkElement)window.Content; content.Measure(new Size(width, height)); content.Arrange(new Rect(0, 0, width, height)); content.UpdateLayout();
+        beforeRender?.Invoke(); content.UpdateLayout();
         var image = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); image.Render(content);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image)); using var stream = File.Create(path); encoder.Save(stream);
     }
