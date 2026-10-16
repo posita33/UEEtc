@@ -10,9 +10,16 @@ public sealed class EventFileRow(FileAnalysis file, IReadOnlyList<CandidateRow> 
     public IReadOnlyList<CandidateRow> Candidates { get; } = candidates;
     public string RelativePath => File.RelativePath;
     public int CandidateCount => Candidates.Count(c => c.Selected);
+    public int DecrementCount => Candidates.Count(c => c.Selected && (c.IncludeActiveScope || c.TrackActiveScopes));
+    public int AddCount => Candidates.Count(c => c.Selected && c.QuantityEnabled);
     public bool CanSelect => Candidates.Count > 0;
     private bool selected;
     public bool Selected { get => selected; set { if (selected == value) return; selected = value; PropertyChanged?.Invoke(this, new(nameof(Selected))); changed(); } }
-    public void RefreshCount() => PropertyChanged?.Invoke(this, new(nameof(CandidateCount)));
+    public void RefreshCount()
+    {
+        PropertyChanged?.Invoke(this, new(nameof(CandidateCount)));
+        PropertyChanged?.Invoke(this, new(nameof(DecrementCount)));
+        PropertyChanged?.Invoke(this, new(nameof(AddCount)));
+    }
     public event PropertyChangedEventHandler? PropertyChanged;
 }
