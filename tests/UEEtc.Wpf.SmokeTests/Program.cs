@@ -39,6 +39,7 @@ internal static class Program
             Assert(!cpuPath.IsEnabled, "CPU locks inputs"); Wait(cpuAnalyze);
             var cpuFile = ((SelectableFile)((DataGrid)cpu.FindName("FileList")).SelectedItem).File;
             Assert(cpuFile.AddedCpuScopes == 0, "Focused CPU skips this tiny branch wrapper by default");
+            Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "No CPU changes keeps apply disabled");
             var allFunctions = (CheckBox)cpu.FindName("AllFunctionsOption");
             allFunctions.IsChecked = true; allFunctions.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
             cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(cpuAnalyze);
@@ -48,7 +49,9 @@ internal static class Program
             Assert(!cpuFile.ProposedText.Contains("TRACE_COUNTER_INCREMENT"), "CPU never inserts event counts");
             Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE(F Work)"), "Auto CPU label is class and function as plain text");
             Assert(cpuFile.ProposedText.IndexOf("Super::Work();", StringComparison.Ordinal) < cpuFile.ProposedText.IndexOf("TRACE_CPUPROFILER", StringComparison.Ordinal), "CPU starts after Super");
-            Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "CPU starts with zero apply selection");
+            Assert(cpuRow.Selected && FindButton(cpu, "ApplyButton").IsEnabled, "CPU changes are selected and applicable immediately after analysis");
+            cpuRow.Selected = false;
+            Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "Clearing CPU selection disables apply");
             cpuRow.Selected = true;
             Assert(FindButton(cpu, "ApplyButton").IsEnabled, "Selected CPU file can be applied");
             ((ComboBox)cpu.FindName("CpuMacroOption")).SelectedIndex = 2;
@@ -72,9 +75,9 @@ internal static class Program
             var eventFile = ((IEnumerable<EventFileRow>)eventFiles.ItemsSource).Single();
             var rows = ((IEnumerable<CandidateRow>)list.ItemsSource).ToArray();
             Assert(rows[0].DisplayName == "F Work if1", "Saved generated path label migrates to the short default");
-            Assert(rows.Length == 2 && rows.All(r => r.Selected) && !eventFile.Selected, "Two included branches in an unselected file");
+            Assert(rows.Length == 2 && rows.All(r => r.Selected) && eventFile.Selected, "Two included branches in an automatically selected file");
             Assert(ReferenceEquals(((FrameworkElement)events.FindName("QuantityEditor")).DataContext, rows[0]), "Quantity editor binds the highlighted candidate");
-            Assert(!FindButton(events, "ApplyButton").IsEnabled, "Discovery cannot be applied");
+            Assert(FindButton(events, "ApplyButton").IsEnabled, "Valid event preview can be applied immediately after analysis");
             Assert(((TextBox)events.FindName("ContextText")).Text.Contains("bCacheHit"), "Candidate context includes condition");
             eventFile.Selected = true; rows[1].Selected = false; rows[0].CounterName = "VerifiedCacheHitCount"; rows[0].DisplayName = "Cache/VerifiedHits";
             var previewButton = FindButton(events, "PreviewButton"); previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
@@ -122,11 +125,12 @@ internal static class Program
             try
             {
                 Assert(((TextBox)restarted.FindName("SourcePath")).Text == root, "Event source survives application restart");
+                Assert(!FindButton(restarted, "ApplyButton").IsEnabled, "Restart still requires fresh analysis before apply");
                 var restartAnalyze = FindButton(restarted, "AnalyzeButton");
                 restartAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(restartAnalyze);
                 var restartedRows = ((IEnumerable<CandidateRow>)((DataGrid)restarted.FindName("CandidateList")).ItemsSource).ToArray();
                 Assert(restartedRows[0].CounterName == "ChangedName" && restartedRows[0].DisplayName == "Cache/VerifiedHits", "Edited candidate names are restored");
-                Assert(((IEnumerable<EventFileRow>)((DataGrid)restarted.FindName("FileList")).ItemsSource).All(f => !f.Selected) && !FindButton(restarted, "ApplyButton").IsEnabled, "Restart never restores selected files or an applicable plan");
+                Assert(((IEnumerable<EventFileRow>)((DataGrid)restarted.FindName("FileList")).ItemsSource).All(f => f.Selected) && FindButton(restarted, "ApplyButton").IsEnabled, "Fresh analysis selects current changes after restart");
                 Assert(restartedRows.All(r => !r.QuantityEnabled && !r.MeaningConfirmed), "Restart requires fresh quantity confirmation");
             }
             finally { restarted.Close(); }

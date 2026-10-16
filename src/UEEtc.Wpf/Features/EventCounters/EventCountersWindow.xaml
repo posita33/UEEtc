@@ -10,7 +10,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="イベントカウンター付与" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="「解析・プレビュー」でADDとスコープDECREMENTの適切な箇所を自動設定します。追加内容と判断理由を確認し、適用するファイルを選んでください。" TextWrapping="Wrap" Margin="0,8,0,12" />
+            <TextBlock Text="「解析・プレビュー」でマクロと適用対象を自動設定します。変更候補のあるファイルは選択済みです。プレビューを確認し、不要なファイルはチェックを外して適用してください。" TextWrapping="Wrap" Margin="0,8,0,12" />
         </StackPanel>
         <DockPanel Grid.Row="1" Margin="0,0,0,10">
             <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="フォルダーを選択…" Click="Browse_Click" Padding="12,6" Margin="8,0,0,0" />
@@ -20,7 +20,7 @@
             <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Click="Analyze_Click" Padding="14,7" Margin="0,0,8,0" />
             <Button x:Name="CancelButton" Content="中止" Click="Cancel_Click" IsEnabled="False" Padding="12,7" Margin="0,0,8,0" />
             <Button x:Name="ExportButton" Content="レポートを保存…" Click="Export_Click" IsEnabled="False" Padding="12,7" Margin="0,0,8,0" />
-            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Click="Apply_Click" IsEnabled="False" Padding="12,7" Margin="0,0,8,0" />
+            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Click="Apply_Click" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="解析・プレビューを実行してください。" Padding="12,7" Margin="0,0,8,0" />
             <Button x:Name="PreviewButton" Content="プレビューを更新" Click="Preview_Click" IsEnabled="False" Padding="12,7" ToolTip="選択や設定の編集後は自動で更新します。" />
         </WrapPanel>
         <DockPanel Grid.Row="3" Margin="0,0,0,8">

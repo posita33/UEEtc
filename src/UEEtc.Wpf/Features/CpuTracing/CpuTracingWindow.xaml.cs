@@ -39,6 +39,7 @@ public partial class CpuTracingWindow : Window
         plan = null;
         files = [];
         ExportButton.IsEnabled = ApplyButton.IsEnabled = false;
+        ApplyButton.ToolTip = "設定が変更されました。解析・プレビューを実行してください。";
         FileList.ItemsSource = null;
         PreviewText.Clear(); OriginalText.Text = DiagnosticsText.Text = "";
         FunctionList.ItemsSource = null;
@@ -68,14 +69,14 @@ public partial class CpuTracingWindow : Window
         {
             var progress = new Progress<string>(path => StatusText.Text = "解析中: " + path);
             plan = await Task.Run(() => service.Analyze(root, options, progress, tokenSource.Token));
-            files = plan.Files.Select(f => new SelectableFile(f, SelectionChanged)).ToList();
+            files = plan.Files.Select(f => new SelectableFile(f, SelectionChanged, initiallySelected: true)).ToList();
             FileList.ItemsSource = files;
             FilterChanged(this, new TextChangedEventArgs(TextBox.TextChangedEvent, UndoAction.None));
             DiagnosticsText.Text = string.Join(Environment.NewLine, plan.Diagnostics.Concat(
                 plan.Files.SelectMany(f => f.Diagnostics.Select(d => f.RelativePath + ": " + d))));
             if (plan.DiagnosticCount == 0) DiagnosticsText.Text = "診断なし。C++ のコンパイル確認は別途必要です。";
             FileList.SelectedItem = FileList.Items.Cast<SelectableFile>().FirstOrDefault(f => f.File.HasChanges) ?? FileList.Items.Cast<SelectableFile>().FirstOrDefault();
-            StatusText.Text = ReportExporter.Summary(plan) + "。適用するファイルをチェックしてください。初期選択0件。";
+            StatusText.Text = ReportExporter.Summary(plan) + $"。変更候補のある {files.Count(f => f.Selected)} ファイルを適用対象に選択しました。一覧で対象を外せます。";
         }
         catch (OperationCanceledException) { StatusText.Text = "解析を中止しました。"; }
         catch (Exception error) { ShowError(error); }
@@ -141,6 +142,10 @@ public partial class CpuTracingWindow : Window
         CancelButton.IsEnabled = value && canCancel;
         ExportButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 };
         ApplyButton.IsEnabled = !value && plan is { DiagnosticCount: 0 } && SelectedPlan is { ChangedFiles: > 0 };
+        ApplyButton.ToolTip = value ? "解析の完了を待ってください。" : plan is null ? "解析・プレビューを実行してください。" :
+            plan.DiagnosticCount > 0 ? "診断の内容を解消してから再解析してください。" :
+            SelectedPlan is not { ChangedFiles: > 0 } ? "変更候補のあるファイルを一覧でチェックしてください。" :
+            $"選択した {SelectedPlan.ChangedFiles} ファイルに、確認後バックアップを作成して適用します。";
         Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }
 

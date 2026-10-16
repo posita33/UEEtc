@@ -28,7 +28,8 @@ internal static class WorkflowTests
             ((TextBox)cpu.FindName("SourcePath")).Text = source; Click(cpu, "AnalyzeButton"); Until(() => !cpu.IsBusy);
             var list = (DataGrid)cpu.FindName("FileList");
             var files = ((IEnumerable<SelectableFile>)list.ItemsSource).ToArray();
-            check(files.Length == 2 && files.All(f => !f.Selected), "CPU file choices start empty");
+            check(files.Length == 2 && files.All(f => f.Selected) && ((Button)cpu.FindName("ApplyButton")).IsEnabled, "CPU changed files start selected with apply enabled");
+            Click(cpu, "ClearAllButton");
             var filter = (TextBox)cpu.FindName("FilterText"); filter.Text = "Alpha";
             check(list.Items.Count == 1, "CPU filters by function and path"); Click(cpu, "SelectVisibleButton");
             check(cpu.SelectedPlan?.Files.Single().RelativePath == "Alpha.cpp", "Visible selection selects only Alpha");
@@ -68,6 +69,8 @@ internal static class WorkflowTests
             check(row.QuantityEnabled && row.MeaningConfirmed && row.QuantityValue == "NumBytes" && row.QuantityUnit == "bytes", "Recommendation automatically counts input quantity");
             var eventList = (DataGrid)events.FindName("FileList");
             var eventFile = ((IEnumerable<EventFileRow>)eventList.ItemsSource).Single(f => f.CanSelect);
+            check(eventFile.Selected && ((Button)events.FindName("ApplyButton")).IsEnabled, "Event input quantities are immediately applicable without selecting files manually");
+            check(((IEnumerable<EventFileRow>)eventList.ItemsSource).Where(f => !f.CanSelect).All(f => !f.Selected), "Files without event candidates remain unselected");
             eventFile.Selected = true; Until(() => !events.IsPreviewPending);
             check(((Button)events.FindName("ApplyButton")).IsEnabled, "Automatic input quantity is ready with file selection");
             row.MeaningConfirmed = false; Until(() => !events.IsPreviewPending);
@@ -89,6 +92,7 @@ internal static class WorkflowTests
             Click(events, "ClearVisibleButton"); Until(() => !events.IsPreviewPending);
             check(!eventFile.Selected && !((Button)events.FindName("ApplyButton")).IsEnabled, "Clear visible disables file apply while retaining reference preview");
             row.QuantityEnabled = false; Until(() => !events.IsPreviewPending);
+            check(((Button)events.FindName("ApplyButton")).ToolTip.ToString()!.Contains("チェック"), "Disabled apply explains how to choose target files");
             Click(events, "SelectAllButton"); Until(() => !events.IsPreviewPending);
             check(eventFile.Selected && events.SelectedPlan?.ChangedFiles == 1, "Global file selection skips files without candidates");
             eventList.SelectedItems.Clear(); eventList.SelectedItems.Add(eventFile); Click(events, "ClearRowsButton"); Until(() => !events.IsPreviewPending);
