@@ -99,6 +99,7 @@ public partial class EventCountersWindow : Window
         plan = null;
         if (ExportButton is null) return;
         ExportButton.IsEnabled = ApplyButton.IsEnabled = false;
+        ApplyButton.ToolTip = scan is null ? "解析・プレビューを実行してください。" : "変更した設定のプレビュー更新を待ってください。";
         PreviewText.Clear();
         PreviewSummary.Text = "";
         foreach (var file in files) file.RefreshCount();
@@ -138,7 +139,7 @@ public partial class EventCountersWindow : Window
             rows = scan.Candidates.OrderBy(c => c.Hint == "条件分岐").Select(c => new CandidateRow(c, InvalidatePlan,
                 row => { inputs.Set(scope + c.Id + ".Name", row.CounterName); inputs.Set(scope + c.Id + ".Display", row.DisplayName); },
                 inputs.Get(scope + c.Id + ".Name"), RestoredDisplay(c, inputs.Get(scope + c.Id + ".Display")))).ToList();
-            files = scan.Snapshot.Files.Select(f => new EventFileRow(f, rows.Where(r => r.Candidate.RelativePath == f.RelativePath).ToArray(), InvalidatePlan)).ToList();
+            files = scan.Snapshot.Files.Select(f => new EventFileRow(f, rows.Where(r => r.Candidate.RelativePath == f.RelativePath).ToArray(), InvalidatePlan, initiallySelected: true)).ToList();
             FileList.ItemsSource = files;
             FilterChanged(this, new TextChangedEventArgs(TextBox.TextChangedEvent, UndoAction.None));
             DiagnosticsText.Text = string.Join(Environment.NewLine, scan.Snapshot.Diagnostics.Concat(scan.Snapshot.Files.SelectMany(f => f.Diagnostics.Select(d => f.RelativePath + ": " + d))));
@@ -249,6 +250,11 @@ public partial class EventCountersWindow : Window
         FileList.IsEnabled = CandidateList.IsEnabled = QuantityEditor.IsEnabled = scan is not null && (!value || previewBuilding);
         ExportButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 };
         ApplyButton.IsEnabled = !value && SelectedPlan is { ChangedFiles: > 0 } && plan is { DiagnosticCount: 0, RequiresQuantityConfirmation: false };
+        ApplyButton.ToolTip = value ? "解析・プレビューの完了を待ってください。" : plan is null ? "解析・プレビューを実行し、入力エラーがあれば修正してください。" :
+            plan.DiagnosticCount > 0 ? "診断の内容を解消してから再解析してください。" :
+            plan.RequiresQuantityConfirmation ? "詳細設定で数量ADDの意味・単位を確認するか、ADDを無効にしてください。" :
+            SelectedPlan is not { ChangedFiles: > 0 } ? "変更候補のあるファイルを一覧でチェックしてください。" :
+            $"選択した {SelectedPlan.ChangedFiles} ファイルに、確認後バックアップを作成して適用します。";
         CancelButton.IsEnabled = value && cancellation is not null;
         Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }

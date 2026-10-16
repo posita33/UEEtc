@@ -13,7 +13,7 @@ Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジ
 
 CPU のラベルは「クラス名 関数名」です。対応する `Super::同じ関数名(...)` がある場合はその後から計測し、安全な配置を判断できない構文は理由を表示します。[CPU の名前・計測範囲](wiki/tracing/cpu-scope-policy.md)を参照してください。
 
-イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択したファイルにだけ追加します。ファイルの適用選択は初期0件です。[現行の使い方と構成](wiki/tracing/event-files-and-input-quantities.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
+イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択したファイルにだけ追加します。WPFでは解析時に変更候補のあるファイルを適用対象として選択します。[現行の使い方と構成](wiki/tracing/automatic-counter-preview.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
 
 CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とSTRは同じ静的ID経路で、STRは動的文字列用ではありません。[Engine調査と計測モードの使い分け](wiki/tracing/cpu-macros-and-counter-lifetimes.md)を参照してください。
 
@@ -75,7 +75,7 @@ dotnet run --project src/UEEtc.Console -- cpu "D:/Projects/posita/git/Game/Block
 dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/TraceReports/discovery"
 ```
 
-WPF はメイン画面から機能を選び、ソースフォルダーを指定して「解析・プレビュー」を実行します。両画面ともファイル単位の一覧で、初期の適用選択は0件です。全体・表示中・強調行の選択／解除、Ctrl/Shiftの複数行選択、Space切替に対応します。変更行を緑色と「+」で示し、前後の変更箇所へ移動できます。
+WPF はメイン画面から機能を選び、ソースフォルダーを指定して「解析・プレビュー」を実行します。両画面とも変更候補のあるファイルが適用対象として選択され、問題のない変更案では「元ファイルへ適用」を押せます。不要なファイルはチェックを外してください。全体・表示中・強調行の選択／解除、Ctrl/Shiftの複数行選択、Space切替に対応します。変更行を緑色と「+」で示し、前後の変更箇所へ移動できます。
 
 イベントは「解析・プレビュー」で入力数量のADDを自動設定し、入力配列を直接処理するバッチ分岐には別のスコープ現在数（入口INCREMENT・退出DECREMENT）も追加します。累積回数は保持します。付与後プレビューで追加内容・理由・差分を確認できます。「候補・詳細設定」では候補の除外と、折りたたみ内の名前・値の変更ができます。[自動設定の条件・操作・実験結果](wiki/tracing/automatic-counter-preview.md)を参照してください。
 

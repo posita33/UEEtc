@@ -36,7 +36,7 @@
             <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Padding="14,7" Margin="0,0,8,0" Click="Analyze_Click" />
             <Button x:Name="CancelButton" Content="中止" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Cancel_Click" />
             <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Export_Click" />
-            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" Click="Apply_Click" />
+            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="解析・プレビューを実行してください。" Click="Apply_Click" />
         </WrapPanel>
         <DockPanel Grid.Row="3" Margin="0,0,0,8">
             <TextBlock Text="検索" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
