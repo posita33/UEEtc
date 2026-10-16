@@ -10,7 +10,7 @@
         <StackPanel>
             <TextBlock Text="イベントカウンター付与" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Text="条件分岐への到達回数を計測します。候補のヒントは名前からの推測です。数える意味を確認して選択し、名前を編集してください。" TextWrapping="Wrap" Margin="0,8,0,6" />
-            <TextBlock Text="現在個数・処理中件数は減算や SET の設計が必要です。この画面では累積回数だけを追加します。初期選択は 0 件です。" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <TextBlock Text="累積回数を追加します。数量 ADD は別タブで明示的に指定できます。現在個数・処理中件数は減算や SET の設計が必要です。初期選択は 0 件です。" TextWrapping="Wrap" Margin="0,0,0,12" />
         </StackPanel>
         <DockPanel Grid.Row="1" Margin="0,0,0,10">
             <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="フォルダーを選択…" Click="Browse_Click" Padding="12,6" Margin="8,0,0,0" />
@@ -46,7 +46,19 @@
             <Button x:Name="ExportButton" Content="レポートを保存…" Click="Export_Click" IsEnabled="False" Padding="12,7" Margin="0,0,8,0" />
             <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Click="Apply_Click" IsEnabled="False" Padding="12,7" />
         </WrapPanel>
-        <TabControl Grid.Row="5">
+        <TabControl Grid.Row="5" SelectedIndex="1">
+            <TabItem x:Name="QuantityTab" Header="数量 ADD（任意）">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="QuantityEditor" Margin="10" DataContext="{Binding SelectedItem, ElementName=CandidateList}" IsEnabled="False">
+                        <TextBlock Text="一覧で選択した分岐に、回数とは別の累積数量を追加します。値は未使用の符号なし32ビット以下の値引数、または0～4294967295の十進整数に限定します。実際に処理した量かどうかはソースで確認してください。" TextWrapping="Wrap" />
+                        <CheckBox Content="この候補に数量 ADD を追加" IsChecked="{Binding QuantityEnabled}" Margin="0,8" />
+                        <WrapPanel><TextBlock Text="識別子 " /><TextBox Width="270" Text="{Binding QuantityName, UpdateSourceTrigger=PropertyChanged}" /><TextBlock Text="  表示名 " /><TextBox Width="360" Text="{Binding QuantityDisplay, UpdateSourceTrigger=PropertyChanged}" /></WrapPanel>
+                        <WrapPanel Margin="0,8"><TextBlock Text="値 " /><ComboBox x:Name="QuantityValueInput" Width="270" IsEditable="True" ItemsSource="{Binding Candidate.AddValues}" Text="{Binding QuantityValue, UpdateSourceTrigger=PropertyChanged}" /><TextBlock Text="  単位（bytes / items 等） " /><TextBox Width="170" Text="{Binding QuantityUnit, UpdateSourceTrigger=PropertyChanged}" /></WrapPanel>
+                        <CheckBox Content="値の意味・単位・この分岐で加算する意味を確認した" IsChecked="{Binding MeaningConfirmed}" />
+                        <TextBlock Text="ADD の設定・確認状態は保存しません。上の一覧の「選択」も有効にしてプレビューしてください。" TextWrapping="Wrap" Margin="0,8" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
             <TabItem Header="候補の位置・数える内容"><TextBox x:Name="ContextText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
             <TabItem Header="付与後プレビュー"><TextBox x:Name="PreviewText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
             <TabItem Header="診断"><TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" /></TabItem>

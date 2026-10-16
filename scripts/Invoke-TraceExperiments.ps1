@@ -1,13 +1,16 @@
 param(
     [string]$LyraSource = 'D:/Projects/posita/UE/R_A_D/LyraStarterGame/Source',
     [string]$BlockBreakerSource = 'D:/Projects/posita/git/Game/BlockBreaker/Source',
-    [ValidateSet('cpu', 'counter', 'both')][string]$Mode = 'cpu'
+    [ValidateSet('cpu', 'counter', 'both')][string]$Mode = 'cpu',
+    [switch]$Focused
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/trace-experiments/run-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 [string[]]$modeFlags = @(switch ($Mode) { 'counter' { '--counter-only' } 'both' { '--both' } })
+if ($Focused -and $Mode -ne 'cpu') { throw 'Focused is supported only with cpu mode.' }
+[string[]]$commandPrefix = @(); if ($Focused) { $commandPrefix = @('cpu') }
 
 function Get-SourceManifest([string]$Root) {
     @(Get-ChildItem -LiteralPath $Root -Recurse -File | Sort-Object FullName | ForEach-Object {
@@ -21,13 +24,13 @@ foreach ($target in @(@{ Name = 'lyra'; Root = $LyraSource }, @{ Name = 'blockbr
     $before = Get-SourceManifest $target.Root
     $before | ConvertTo-Json -Depth 3 | Set-Content (Join-Path $runRoot ($target.Name + '-before.json')) -Encoding utf8
     $output = Join-Path $runRoot $target.Name
-    dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release --no-build -- $target.Root @modeFlags --report $output |
+    dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release --no-build -- @commandPrefix $target.Root @modeFlags --report $output |
         Set-Content (Join-Path $runRoot ($target.Name + '.log')) -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw "Analysis failed: $($target.Name)" }
     git -C $target.Root apply --check (Join-Path $output 'changes.patch')
     if ($LASTEXITCODE -ne 0) { throw "Review patch check failed: $($target.Name)" }
     $secondOutput = Join-Path $runRoot ($target.Name + '-second-pass')
-    dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release --no-build -- (Join-Path $output 'modified') @modeFlags --report $secondOutput |
+    dotnet run --project (Join-Path $repoRoot 'src/UEEtc.Console') --configuration Release --no-build -- @commandPrefix (Join-Path $output 'modified') @modeFlags --report $secondOutput |
         Set-Content (Join-Path $runRoot ($target.Name + '-second-pass.log')) -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw "Second analysis failed: $($target.Name)" }
     $secondPlan = Get-Content (Join-Path $secondOutput 'report.json') -Raw -Encoding utf8 | ConvertFrom-Json
@@ -39,7 +42,7 @@ foreach ($target in @(@{ Name = 'lyra'; Root = $LyraSource }, @{ Name = 'blockbr
     $counters = @($report.Files.Functions | Where-Object { $_.Status -eq 'Add' -and $_.Counter } | Select-Object -ExpandProperty Counter -Unique)
     $hashedCounters = @($counters | Where-Object { $_ -match '_CallCount_[0-9A-F]{16}(?:_\d+)?$' })
     [pscustomobject]@{
-        Name = $target.Name; Mode = $Mode; SourceFiles = $before.Count; CppFiles = $report.Files.Count
+        Name = $target.Name; Mode = $Mode; Focused = [bool]$Focused; SourceFiles = $before.Count; CppFiles = $report.Files.Count
         ChangedFiles = $report.ChangedFiles; AddedFunctions = $report.AddedFunctions
         SkippedFunctions = $report.SkippedFunctions; Diagnostics = $report.DiagnosticCount
         SecondPassChanges = $secondPlan.ChangedFiles; OriginalFileChanges = $difference.Count

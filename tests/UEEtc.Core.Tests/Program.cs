@@ -382,6 +382,7 @@ var tests = new (string Name, Action Run)[]
 
 tests = tests.Concat(EventCounterTests.All).ToArray();
 tests = tests.Concat(CpuPolicyTests.All).ToArray();
+tests = tests.Concat(FocusAndQuantityTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {

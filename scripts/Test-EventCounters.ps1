@@ -1,4 +1,4 @@
-param()
+param([switch]$Quantity)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/event-cpp/' + [guid]::NewGuid().ToString('N'))
@@ -8,17 +8,18 @@ New-Item -ItemType Directory -Path $sourceDir,(Join-Path $stubDir 'ProfilingDebu
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText((Join-Path $sourceDir 'Fixture.cpp'), @'
 #include "Fixture.h"
-int Work(int value) {
-    if (value > 0) { return value + 1; }
+int Work(int value, unsigned int Size) {
+    if (value > 0) { return value + static_cast<int>(Size); }
     else if (value == 0) { return 7; }
     else { return -1; }
 }
 int main() {
-    const int a = Work(1);
-    const int b = Work(0);
-    const int c = Work(-1);
-    if (a != 2 || b != 7 || c != -1) { return 1; }
+    const int a = Work(1, 2);
+    const int b = Work(0, 7);
+    const int c = Work(-1, 0);
+    if (a != 3 || b != 7 || c != -1) { return 1; }
     if (CounterTotal != (TEST_COUNTER_ENABLED ? 3 : 0)) { return 2; }
+    if (QuantityTotal != (TEST_COUNTER_ENABLED && TEST_QUANTITY_ENABLED ? 9 : 0)) { return 3; }
     return 0;
 }
 '@, $utf8)
@@ -26,6 +27,7 @@ int main() {
 #pragma once
 #include <atomic>
 inline int CounterTotal = 0;
+inline unsigned long long QuantityTotal = 0;
 #define TEXT(value) L##value
 '@, $utf8)
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'ProfilingDebugging/CountersTrace.h'), @'
@@ -35,12 +37,15 @@ struct Counter {
     std::atomic<int> Value{0};
     explicit Counter(const wchar_t*) {}
     void Increment() { ++Value; ++CounterTotal; }
+    void Add(unsigned int amount) { QuantityTotal += amount; }
 };
 #define TRACE_DECLARE_ATOMIC_INT_COUNTER(Name, Display) Counter __GTraceCounter##Name(Display);
 #define TRACE_COUNTER_INCREMENT(Name) __GTraceCounter##Name.Increment();
+#define TRACE_COUNTER_ADD(Name, Amount) __GTraceCounter##Name.Add(Amount);
 #else
 #define TRACE_DECLARE_ATOMIC_INT_COUNTER(Name, Display)
 #define TRACE_COUNTER_INCREMENT(Name)
+#define TRACE_COUNTER_ADD(Name, Amount)
 #endif
 '@, $utf8)
 $cli = Join-Path $repoRoot 'src/UEEtc.Console/bin/Release/net10.0/UEEtc.Console.dll'
@@ -50,7 +55,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Discovery failed.' }
 $candidates = Get-Content (Join-Path $discovery 'candidates.json') -Raw -Encoding utf8 | ConvertFrom-Json
 $selection = Get-Content (Join-Path $discovery 'selection.json') -Raw -Encoding utf8 | ConvertFrom-Json
 $selection.Selections = @($candidates | Where-Object Function -eq 'Work' | ForEach-Object {
-    [pscustomobject]@{ Id = $_.Id; CounterName = $_.SuggestedName; DisplayName = $_.DisplayName }
+    $row = [pscustomobject]@{ Id = $_.Id; CounterName = $_.SuggestedName; DisplayName = $_.DisplayName }
+    if ($Quantity) {
+        $amount = if ($_.AddValues -contains 'Size') { 'Size' } elseif ($_.Branch -eq 'If') { '7' } else { '0' }
+        $row | Add-Member Quantity ([pscustomobject]@{ CounterName = $_.SuggestedName + 'Quantity'; DisplayName = $_.DisplayName + '/Quantity'; Value = $amount; Unit = 'items'; MeaningConfirmed = $true })
+    }
+    $row
 })
 if ($selection.Selections.Count -ne 3) { throw 'Expected three Work branches.' }
 $selectionPath = Join-Path $runRoot 'reviewed-selection.json'
@@ -67,7 +77,8 @@ Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.
 Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
 foreach ($enabled in @(0,1)) {
     $exe = Join-Path $runRoot "fixture-$enabled.exe"
-    & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTEST_COUNTER_ENABLED=$enabled" "/I$stubDir" "/Fo$(Join-Path $runRoot "fixture-$enabled.obj")" "/Fe$exe" (Join-Path $output 'modified/Fixture.cpp')
+    $quantityFlag = [int][bool]$Quantity
+    & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTEST_COUNTER_ENABLED=$enabled" "/DTEST_QUANTITY_ENABLED=$quantityFlag" "/I$stubDir" "/Fo$(Join-Path $runRoot "fixture-$enabled.obj")" "/Fe$exe" (Join-Path $output 'modified/Fixture.cpp')
     if ($LASTEXITCODE -ne 0) { throw "Compile failed ($enabled)." }
     & $exe
     if ($LASTEXITCODE -ne 0) { throw "Runtime count or branch semantics changed ($enabled, exit $LASTEXITCODE)." }

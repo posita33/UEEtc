@@ -20,12 +20,21 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
     private bool selected;
     private string counterName = savedName ?? candidate.SuggestedName;
     private string displayName = savedDisplay ?? candidate.DisplayName;
+    private bool quantityEnabled, meaningConfirmed;
+    private string quantityName = candidate.SuggestedName + "Quantity", quantityDisplay = candidate.DisplayName + "/Quantity", quantityValue = "", quantityUnit = "";
+    public bool QuantityEnabled { get => quantityEnabled; set { quantityEnabled = value; Changed(nameof(QuantityEnabled)); } }
+    public bool MeaningConfirmed { get => meaningConfirmed; set { meaningConfirmed = value; Changed(nameof(MeaningConfirmed)); } }
+    public string QuantityName { get => quantityName; set { quantityName = value; Changed(nameof(QuantityName)); } }
+    public string QuantityDisplay { get => quantityDisplay; set { quantityDisplay = value; Changed(nameof(QuantityDisplay)); } }
+    public string QuantityValue { get => quantityValue; set { quantityValue = value; Changed(nameof(QuantityValue)); } }
+    public string QuantityUnit { get => quantityUnit; set { quantityUnit = value; Changed(nameof(QuantityUnit)); } }
     public bool Selected { get => selected; set { selected = value; Changed(nameof(Selected)); } }
     public string CounterName { get => counterName; set { counterName = value; Changed(nameof(CounterName)); } }
     public string DisplayName { get => displayName; set { displayName = value; Changed(nameof(DisplayName)); } }
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); if (name != nameof(Selected)) edited?.Invoke(this); }
-    public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName);
+    public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName,
+        QuantityEnabled ? new(QuantityName, QuantityDisplay, QuantityValue, QuantityUnit, MeaningConfirmed) : null);
 }
 
 public partial class EventCountersWindow : Window
@@ -161,6 +170,7 @@ public partial class EventCountersWindow : Window
         busy = value;
         AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = SourcePath.IsEnabled = FilterText.IsEnabled = !value;
         CandidateList.IsEnabled = PreviewButton.IsEnabled = !value && scan is not null;
+        QuantityEditor.IsEnabled = !value && scan is not null;
         ExportButton.IsEnabled = !value && plan is not null;
         ApplyButton.IsEnabled = !value && plan is { ChangedFiles: > 0, DiagnosticCount: 0 };
         CancelButton.IsEnabled = value && cancellation is not null;

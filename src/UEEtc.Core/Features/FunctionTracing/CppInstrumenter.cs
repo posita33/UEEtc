@@ -119,9 +119,12 @@ public sealed class CppInstrumenter
                     t.Contains("SCOPE_CYCLE_COUNTER", StringComparison.Ordinal) || t.StartsWith("SCOPED_NAMED_EVENT", StringComparison.Ordinal));
                 bool existingCounter = HasCall(t => t.StartsWith("TRACE_COUNTER_", StringComparison.Ordinal));
                 var cpuPlacement = CpuScopePlacement.Find(name, tokens, scanned, open, close);
-                bool addCpu = options.CpuScopes && !existingCpu && cpuPlacement.Position is not null;
+                var focus = cpuPlacement.Position is { } position && options.FocusedCpu
+                    ? CpuScopeFocus.Evaluate(tokens, position, close) : (Include: true, Reason: "");
+                bool addCpu = options.CpuScopes && !existingCpu && cpuPlacement.Position is not null && focus.Include;
                 bool addCounter = options.CallCounters && !existingCounter;
-                string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" : cpuPlacement.Decision;
+                string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" :
+                    !focus.Include ? focus.Reason : cpuPlacement.Decision + (options.FocusedCpu && cpuPlacement.Position is not null ? " / " + focus.Reason : "");
                 string counterDecision = !options.CallCounters ? "未選択" : existingCounter ? "既存のカウンター操作を維持（意味は自動推定しない）" : "追加：関数進入回数（成功・命中数ではない）";
                 string decisions = "CPU: " + cpuDecision + " / Counter: " + counterDecision;
                 if (!addCpu && !addCounter)

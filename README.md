@@ -75,6 +75,8 @@ dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/
 
 WPF ではメイン画面から機能を選び、ソースフォルダーを指定します。イベント画面は「候補を解析」→対象にチェック・名前を編集→「選択した箇所をプレビュー」の順に使います。条件式と前後のソース、付与後のソース、診断を確認できます。
 
+CPU はループ・対象API・複数の処理呼び出しを根拠に候補を絞ります。「全関数（互換）」または `cpu <path> --all-functions` で従来の対象に戻せます。イベント画面の「数量 ADD（任意）」では回数とは別の数量を、値・単位・意味を確認して追加できます。[Engine 調査・使い方・実験結果](wiki/tracing/focused-cpu-and-quantity-counters.md)を参照してください。
+
 ソースパス欄はフォルダーを 1 つドロップして指定できます。入力したパス・絞り込み・編集したカウンター名は次回起動時にも復元します。候補の選択や適用待ちの変更案は復元しません。[保存内容と保存先](wiki/input-assistance.md)も参照してください。
 
 両方ともレポート・差分・加工済みコピーの保存に対応します。実際に元ファイルを変更する操作は、WPF の「元ファイルへ適用」または Console の `--apply` です。適用時にはバックアップを作成します。[詳細な使い方と制限](wiki/tracing/implementation.md)を参照してください。
@@ -97,10 +99,12 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 # MSVC x64 の C++ ツールが必要
 ./scripts/Test-CppInstrumentation.ps1
 ./scripts/Test-EventCounters.ps1
+./scripts/Test-EventCounters.ps1 -Quantity
 ./scripts/Test-CpuScopePolicy.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1
+./scripts/Invoke-TraceExperiments.ps1 -Focused
 ./scripts/Invoke-EventCounterExperiments.ps1
 ./scripts/Invoke-ReviewedEventCounterExamples.ps1
 ```
