@@ -2,13 +2,15 @@ param(
     [string]$LyraSource = 'D:/Projects/posita/UE/R_A_D/LyraStarterGame/Source',
     [string]$BlockBreakerSource = 'D:/Projects/posita/git/Game/BlockBreaker/Source',
     [ValidateSet('cpu', 'counter', 'both')][string]$Mode = 'cpu',
-    [switch]$Focused
+    [switch]$Focused,
+    [ValidateSet('auto','scope','str')][string]$CpuMacro = 'auto'
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/trace-experiments/run-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 [string[]]$modeFlags = @(switch ($Mode) { 'counter' { '--counter-only' } 'both' { '--both' } })
+$modeFlags += @('--cpu-macro', $CpuMacro)
 if ($Focused -and $Mode -ne 'cpu') { throw 'Focused is supported only with cpu mode.' }
 [string[]]$commandPrefix = @(); if ($Focused) { $commandPrefix = @('cpu') }
 
@@ -42,12 +44,13 @@ foreach ($target in @(@{ Name = 'lyra'; Root = $LyraSource }, @{ Name = 'blockbr
     $counters = @($report.Files.Functions | Where-Object { $_.Status -eq 'Add' -and $_.Counter } | Select-Object -ExpandProperty Counter -Unique)
     $hashedCounters = @($counters | Where-Object { $_ -match '_CallCount_[0-9A-F]{16}(?:_\d+)?$' })
     [pscustomobject]@{
-        Name = $target.Name; Mode = $Mode; Focused = [bool]$Focused; SourceFiles = $before.Count; CppFiles = $report.Files.Count
+        Name = $target.Name; Mode = $Mode; Focused = [bool]$Focused; CpuMacro = $CpuMacro; SourceFiles = $before.Count; CppFiles = $report.Files.Count
         ChangedFiles = $report.ChangedFiles; AddedFunctions = $report.AddedFunctions
         SkippedFunctions = $report.SkippedFunctions; Diagnostics = $report.DiagnosticCount
         SecondPassChanges = $secondPlan.ChangedFiles; OriginalFileChanges = $difference.Count
         UniqueGeneratedCounters = $counters.Count; HashedCounters = $hashedCounters.Count
         AddedCpuScopes = $report.AddedCpuScopes; AddedCallCounters = $report.AddedCallCounters
+        AddedPlainCpuScopes = $report.AddedPlainCpuScopes; AddedStringCpuScopes = $report.AddedStringCpuScopes
     } | ConvertTo-Json | Set-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8
     Get-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8
 }

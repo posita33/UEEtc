@@ -17,7 +17,8 @@ public sealed record EventCounterCandidate(string Id, string RelativePath, strin
     internal string Indent { get; init; } = "";
 }
 
-public sealed record EventCounterSelection(string Id, string CounterName, string DisplayName, QuantityCounterSelection? Quantity = null);
+public sealed record EventCounterSelection(string Id, string CounterName, string DisplayName, QuantityCounterSelection? Quantity = null,
+    CounterMeasurement Measurement = CounterMeasurement.Cumulative);
 public sealed record EventCounterPreviewResult(AnalysisPlan? Plan, IReadOnlyList<string> Errors);
 
 public sealed class EventCounterScan
@@ -211,6 +212,7 @@ public sealed class EventCounterService
             if (s is null || string.IsNullOrWhiteSpace(s.Id) || !available.TryGetValue(s.Id, out var candidate)) { errors.Add("候補が存在しません。再解析してください。"); continue; }
             if (!seen.Add(s.Id)) errors.Add("同じ候補が複数回選択されています。");
             Metric(s.CounterName, s.DisplayName);
+            if (!Enum.IsDefined(s.Measurement)) errors.Add(candidate.DisplayName + ": 未知のカウンター計測モードです。");
             if (s.Quantity is not { } q) continue;
             Metric(q.CounterName, q.DisplayName);
             if (string.IsNullOrWhiteSpace(q.Unit) || q.Unit.Any(char.IsControl)) errors.Add(candidate.DisplayName + ": ADD の単位を入力してください。");
@@ -273,6 +275,8 @@ public sealed class EventCounterService
             {
                 var c = available[s.Id]; string name = assigned[s.Id];
                 string insert = newline + c.Indent + "TRACE_COUNTER_INCREMENT(" + name + ");" + newline;
+                if (s.Measurement == CounterMeasurement.ActiveScope)
+                    insert += c.Indent + "ON_SCOPE_EXIT" + newline + c.Indent + "{" + newline + c.Indent + unit + "TRACE_COUNTER_DECREMENT(" + name + ");" + newline + c.Indent + "};" + newline;
                 string display = duplicateDisplays.Contains(s.DisplayName) ? s.DisplayName + " [" + s.Id + "]" : s.DisplayName;
                 declarations.Add(unit + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + name + ", TEXT(\"" + Escape(display) + "\"));");
                 if (s.Quantity is { } q)
@@ -283,10 +287,12 @@ public sealed class EventCounterService
                     insert += c.Indent + "TRACE_COUNTER_ADD(" + quantityName + ", " + q.Value + ");" + newline;
                 }
                 edits.Add((c.Position, insert));
-                rows.Add(new(c.Function, c.Line, "Add", c.Reason, name) { EventCounterAdded = true, CounterDecision = c.Branch + ": " + c.Condition,
+                rows.Add(new(c.Function, c.Line, "Add", c.Reason, name) { EventCounterAdded = true, DecrementAdded = s.Measurement == CounterMeasurement.ActiveScope,
+                    CounterMeasurement = s.Measurement.ToString(), CounterDecision = c.Branch + ": " + c.Condition + (s.Measurement == CounterMeasurement.ActiveScope ? " / 分岐スコープ現在数（退出時に減少）" : " / 累積進入回数"),
                     QuantityCounter = s.Quantity is null ? null : assigned[s.Id + "_Quantity"], QuantityValue = s.Quantity?.Value, QuantityUnit = s.Quantity?.Unit });
             }
             string header = syntax.HasCounterInclude ? "" : "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
+            if (selected.Any(s => s.Measurement == CounterMeasurement.ActiveScope) && !syntax.HasScopeExitInclude) header += "#include \"Misc/ScopeExit.h\"" + newline;
             if (syntax.IncludeAnchor > 0 && doc.Text[syntax.IncludeAnchor - 1] != '\n') header = newline + header;
             edits.Add((syntax.IncludeAnchor, header + newline + "namespace {" + newline + string.Join(newline, declarations) + newline + "}" + newline));
             var output = new StringBuilder(doc.Text);

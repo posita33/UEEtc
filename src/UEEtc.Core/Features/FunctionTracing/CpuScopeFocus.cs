@@ -33,7 +33,7 @@ internal static class CpuScopeFocus
             if (name is "if" or "switch" or "catch" or "sizeof" or "alignof" or "static_cast" or "const_cast" or "reinterpret_cast" ||
                 name.StartsWith("Get", StringComparison.Ordinal) || name.StartsWith("Is", StringComparison.Ordinal) ||
                 name.StartsWith("Has", StringComparison.Ordinal) || name.StartsWith("Can", StringComparison.Ordinal) ||
-                name.StartsWith("UE_", StringComparison.Ordinal) || name is "check" or "checkf" or "ensure" or "ensureMsgf") continue;
+                name.StartsWith("UE_", StringComparison.Ordinal) || name.StartsWith("TRACE_", StringComparison.Ordinal) || name is "check" or "checkf" or "ensure" or "ensureMsgf") continue;
             calls++;
         }
         return calls >= 4 ? (true, $"処理呼び出し {calls} 箇所（コストは未測定）") :

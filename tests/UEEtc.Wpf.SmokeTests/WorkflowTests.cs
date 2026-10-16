@@ -75,6 +75,11 @@ internal static class WorkflowTests
             row.MeaningConfirmed = true; Until(() => !events.IsPreviewPending);
             check(((Button)events.FindName("ApplyButton")).IsEnabled, "Confirmed selected recommendation enables apply");
             check(eventPreview.Text.Contains("\t\tTRACE_COUNTER_ADD"), "Recommended ADD follows tab indentation");
+            row.TrackActiveScopes = true; Until(() => !events.IsPreviewPending);
+            check(eventPreview.Text.Contains("ON_SCOPE_EXIT") && eventPreview.Text.Contains("TRACE_COUNTER_DECREMENT("), "Active scope mode generates a matching exit decrement");
+            check(events.SelectedPlan?.AddedDecrements == 1 && row.CounterName.EndsWith("_ActiveScopes", StringComparison.Ordinal), "Active scope metadata and default name change together");
+            row.TrackActiveScopes = false; Until(() => !events.IsPreviewPending);
+            check(!eventPreview.Text.Contains("TRACE_COUNTER_DECREMENT("), "Cumulative mode restores increment only");
             if (screenshots is not null) Program.Screenshot(events, Path.Combine(screenshots, "workflow-events.png"), 1280, 900);
             row.QuantityValue = "Unsafe()"; Until(() => !events.IsPreviewPending);
             check(!((Button)events.FindName("ApplyButton")).IsEnabled && ((TextBlock)events.FindName("StatusText")).Text.Contains("更新できません"), "Invalid editing reports inline and cannot apply");

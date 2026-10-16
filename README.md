@@ -13,7 +13,9 @@ Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジ
 
 CPU のラベルは「クラス名 関数名」です。対応する `Super::同じ関数名(...)` がある場合はその後から計測し、安全な配置を判断できない構文は理由を表示します。[CPU の名前・計測範囲](wiki/tracing/cpu-scope-policy.md)を参照してください。
 
-イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択した場所にだけ追加します。候補はすべて初期選択オフです。[Engine の用途調査・現行の使い方と構成](wiki/tracing/event-counters.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
+イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択したファイルにだけ追加します。ファイルの適用選択は初期0件です。[現行の使い方と構成](wiki/tracing/event-files-and-input-quantities.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
+
+CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とSTRは同じ静的ID経路で、STRは動的文字列用ではありません。イベントは累積回数を標準とし、分岐の現在数を選んだ場合は退出時のDECREMENTを追加します。[Engine調査と計測モードの使い分け](wiki/tracing/cpu-macros-and-counter-lifetimes.md)を参照してください。
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
@@ -104,6 +106,8 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 ./scripts/Test-EventCounters.ps1 -Quantity
 ./scripts/Test-EventCounters.ps1 -Batch
 ./scripts/Test-CpuScopePolicy.ps1
+./scripts/Test-CpuScopePolicy.ps1 -CpuMacro str
+./scripts/Test-ScopedEventCounters.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1

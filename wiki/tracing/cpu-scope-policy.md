@@ -6,6 +6,8 @@ status: todo
 
 # CPU スコープの短いラベルと Super 後の配置
 
+通常形／STRの現行の選択規則と比較は [Issue #33 の調査](cpu-macros-and-counter-lifetimes.md) を参照してください。短いラベルと配置の規則は維持します。
+
 標準モードの対象絞り込みは [Issue #21 の追加調査と実装](focused-cpu-and-quantity-counters.md) を参照してください。このページはラベルと配置の規則を説明します。
 
 [目次](../README.md) / [Issue #12](https://github.com/posita33/UEEtc/issues/12) / [Issue #13](https://github.com/posita33/UEEtc/issues/13) / [Quick の調査](quick-scope-cycle-counter.md)

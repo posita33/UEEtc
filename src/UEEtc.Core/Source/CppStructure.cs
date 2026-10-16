@@ -10,6 +10,7 @@ internal sealed class CppStructure
     public List<CppFunction> Functions { get; } = [];
     public int IncludeAnchor { get; }
     public bool HasCounterInclude { get; }
+    public bool HasScopeExitInclude { get; }
 
     public CppStructure(string text)
     {
@@ -26,6 +27,7 @@ internal sealed class CppStructure
             {
                 IncludeAnchor = t.End;
                 HasCounterInclude |= System.Text.RegularExpressions.Regex.IsMatch(t.Text, "^#\\s*include\\s*[\"<]ProfilingDebugging/CountersTrace\\.h[\">]");
+                HasScopeExitInclude |= System.Text.RegularExpressions.Regex.IsMatch(t.Text, "^#\\s*include\\s*[\"<]Misc/ScopeExit\\.h[\">]");
             }
         }
         var stack = new Stack<int>();

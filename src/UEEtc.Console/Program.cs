@@ -14,11 +14,13 @@ static int Run(string[] arguments)
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
         Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--all-functions] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("cpu defaults to static-evidence filtering (loops, known data/wait APIs, 4+ action calls). Cost is not measured. --all-functions retains broad instrumentation.");
+        Console.WriteLine("--cpu-macro auto|scope|str chooses the fixed-label CPU macro. SCOPE and STR use the same static ID path; STR is not the dynamic TEXT macro.");
         Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--recommended-add] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("counters: discover braced if/else branches; select none by default. --report exports candidates.json and an empty selection.json.");
         Console.WriteLine("Copy reviewed Id / CounterName / DisplayName into Selections; --selection validates the source fingerprint before preview/apply.");
         Console.WriteLine("Optional Quantity: { CounterName, DisplayName, Value, Unit, MeaningConfirmed: true }. Value: listed AddValues or decimal uint32 constant. Count and quantity are separate metrics.");
         Console.WriteLine("--recommended-add adds recommended input quantities to reviewed selections without a manual Quantity. Known const UE array Num() values are supported. Input quantities are not successes or completed work.");
+        Console.WriteLine("Selection Measurement: Cumulative (default) increments only; ActiveScope adds ON_SCOPE_EXIT with a matching DECREMENT for this branch's lexical lifetime, not asynchronous work.");
         Console.WriteLine("CPU and event counters are separate features. Counters measure selected branch entries, not inferred successes.");
         Console.WriteLine("Legacy entry-count commands (retained for existing scripts):");
         Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only | --both] [--report <output-full-path>] [--apply]");
@@ -42,6 +44,7 @@ static int Run(string[] arguments)
         string? report = null;
         InstrumentationOptions options = new(FocusedCpu: cpuCommand);
         bool modeChosen = false;
+        bool macroChosen = false;
         for (int i = 1; i < arguments.Length; i++)
         {
             switch (arguments[i])
@@ -51,9 +54,12 @@ static int Run(string[] arguments)
                 case "--all-functions" when cpuCommand && options.FocusedCpu:
                     options = options with { FocusedCpu = false }; break;
                 case "--counter-only" when !modeChosen && !cpuCommand:
-                    options = new(false, true); modeChosen = true; break;
+                    options = options with { CpuScopes = false, CallCounters = true }; modeChosen = true; break;
                 case "--both" when !modeChosen && !cpuCommand:
-                    options = new(true, true); modeChosen = true; break;
+                    options = options with { CpuScopes = true, CallCounters = true }; modeChosen = true; break;
+                case "--cpu-macro" when !macroChosen && i + 1 < arguments.Length:
+                    options = options with { CpuMacro = arguments[++i] switch { "auto" => CpuMacroKind.Auto, "scope" => CpuMacroKind.Scope, "str" => CpuMacroKind.StaticString, _ => throw new ArgumentException("--cpu-macro は auto / scope / str を指定してください。") } };
+                    macroChosen = true; break;
                 case "--report" when i + 1 < arguments.Length && report is null:
                     report = arguments[++i]; break;
                 case "--apply" when !apply:

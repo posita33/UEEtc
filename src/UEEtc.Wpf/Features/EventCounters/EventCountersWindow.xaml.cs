@@ -20,6 +20,21 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
 {
     public EventCounterCandidate Candidate { get; } = candidate;
     private bool selected = true;
+    private bool trackActiveScopes;
+    private bool changingMeasurement;
+    public bool TrackActiveScopes
+    {
+        get => trackActiveScopes;
+        set
+        {
+            if (trackActiveScopes == value) return;
+            changingMeasurement = true;
+            string activeName = Candidate.SuggestedName.EndsWith("_Count", StringComparison.Ordinal) ? Candidate.SuggestedName[..^6] + "_ActiveScopes" : Candidate.SuggestedName + "_ActiveScopes";
+            if (CounterName == (value ? Candidate.SuggestedName : activeName)) CounterName = value ? activeName : Candidate.SuggestedName;
+            if (DisplayName == (value ? Candidate.DisplayName : Candidate.DisplayName + " ActiveScopes")) DisplayName = Candidate.DisplayName + (value ? " ActiveScopes" : "");
+            trackActiveScopes = value; changingMeasurement = false; Changed(nameof(TrackActiveScopes));
+        }
+    }
     private string counterName = savedName ?? candidate.SuggestedName;
     private string displayName = savedDisplay ?? candidate.DisplayName;
     private bool quantityEnabled = candidate.RecommendedQuantity is not null, meaningConfirmed = candidate.RecommendedQuantity is not null;
@@ -37,9 +52,10 @@ public sealed class CandidateRow(EventCounterCandidate candidate, Action changed
     public string CounterName { get => counterName; set { counterName = value; Changed(nameof(CounterName)); } }
     public string DisplayName { get => displayName; set { displayName = value; Changed(nameof(DisplayName)); } }
     public event PropertyChangedEventHandler? PropertyChanged;
-    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); if (name != nameof(Selected)) edited?.Invoke(this); }
+    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); if (!changingMeasurement && name is nameof(CounterName) or nameof(DisplayName)) edited?.Invoke(this); }
     public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName,
-        QuantityEnabled ? new(QuantityName, QuantityDisplay, QuantityValue, QuantityUnit, MeaningConfirmed) : null);
+        QuantityEnabled ? new(QuantityName, QuantityDisplay, QuantityValue, QuantityUnit, MeaningConfirmed) : null,
+        TrackActiveScopes ? CounterMeasurement.ActiveScope : CounterMeasurement.Cumulative);
 }
 
 public partial class EventCountersWindow : Window

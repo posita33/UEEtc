@@ -59,7 +59,8 @@ public partial class CpuTracingWindow : Window
         PreviewText.Clear(); OriginalText.Text = DiagnosticsText.Text = "";
         FunctionList.ItemsSource = null;
         string root = SourcePath.Text.Trim();
-        var options = new InstrumentationOptions(true, false, FocusedCpu: AllFunctionsOption.IsChecked != true);
+        var options = new InstrumentationOptions(true, false, FocusedCpu: AllFunctionsOption.IsChecked != true,
+            CpuMacro: CpuMacroOption.SelectedIndex switch { 1 => CpuMacroKind.Scope, 2 => CpuMacroKind.StaticString, _ => CpuMacroKind.Auto });
         using var tokenSource = new CancellationTokenSource();
         cancellation = tokenSource;
         SetBusy(true, canCancel: true);
@@ -134,6 +135,7 @@ public partial class CpuTracingWindow : Window
     {
         busy = value;
         SourcePath.IsEnabled = BrowseButton.IsEnabled = AnalyzeButton.IsEnabled = AllFunctionsOption.IsEnabled = !value;
+        CpuMacroOption.IsEnabled = !value;
         FileList.IsEnabled = FilterText.IsEnabled = SelectVisibleButton.IsEnabled = ClearVisibleButton.IsEnabled = !value;
         SelectAllButton.IsEnabled = ClearAllButton.IsEnabled = SelectRowsButton.IsEnabled = ClearRowsButton.IsEnabled = !value;
         CancelButton.IsEnabled = value && canCancel;
