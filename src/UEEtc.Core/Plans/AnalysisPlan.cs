@@ -29,7 +29,6 @@ public sealed record FileAnalysis(string RelativePath, IReadOnlyList<FunctionAna
     [JsonIgnore] public byte[] ProposedBytes { get; init; } = [];
     [JsonIgnore] public string OriginalText { get; init; } = "";
     [JsonIgnore] public string ProposedText { get; init; } = "";
-    [JsonIgnore] internal IReadOnlyList<UEEtc.Core.Source.SourceInsertion> Insertions { get; init; } = [];
     public bool HasChanges => !OriginalBytes.AsSpan().SequenceEqual(ProposedBytes);
     public int AddedFunctions => Functions.Count(f => f.Status == "Add");
     public int AddedCpuScopes => Functions.Count(f => f.CpuScopeAdded);

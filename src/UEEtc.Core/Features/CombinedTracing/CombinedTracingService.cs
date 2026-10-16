@@ -13,24 +13,15 @@ public sealed class CombinedTracingService
         // One filesystem discovery and one original-byte snapshot for both independent policies.
         var events = new EventCounterService();
         var scan = events.Analyze(rootPath, progress, cancellationToken);
-        var eventPlan = events.BuildPlan(scan, scan.Candidates.Select(EventCounterDefaults.Create), cancellationToken);
+        var eventProposals = events.Propose(scan, scan.Candidates.Select(EventCounterDefaults.Create).ToArray(), cancellationToken);
         var cpu = new CppInstrumenter();
-        var files = eventPlan.Files.Select(file =>
+        var files = eventProposals.Select(proposal =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var cpuFile = cpu.Analyze(file.RelativePath, file.OriginalBytes, new(FocusedCpu: focusedCpu, CpuMacro: cpuMacro));
-            var insertions = file.Insertions.Concat(cpuFile.Insertions).ToArray();
-            var merged = file with
-            {
-                Functions = cpuFile.Functions.Concat(file.Functions).ToArray(),
-                Diagnostics = cpuFile.Diagnostics.Concat(file.Diagnostics).Distinct(StringComparer.Ordinal).ToArray(),
-                Insertions = insertions
-            };
-            if (insertions.Length == 0) return merged;
-            var document = SourceDocument.Read(file.OriginalBytes);
-            string text = SourceInsertion.Apply(document.Text, insertions);
-            return merged with { OriginalText = document.Text, ProposedText = text, ProposedBytes = document.Encode(text) };
+            var file = proposal.Source;
+            var cpuProposal = cpu.Propose(file.RelativePath, file.OriginalBytes, new(FocusedCpu: focusedCpu, CpuMacro: cpuMacro));
+            return FileProposal.Merge(cpuProposal, proposal).Render();
         }).ToArray();
-        return eventPlan with { Feature = "CombinedTracing", Files = files };
+        return scan.Snapshot with { Feature = "CombinedTracing", Files = files };
     }
 }

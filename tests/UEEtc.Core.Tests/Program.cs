@@ -388,6 +388,7 @@ tests = tests.Concat(EventUsabilityTests.All).ToArray();
 tests = tests.Concat(TraceLifetimeTests.All).ToArray();
 tests = tests.Concat(AutomaticCounterTests.All).ToArray();
 tests = tests.Concat(CombinedTracingTests.All).ToArray();
+tests = tests.Concat(EngineAuditTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {

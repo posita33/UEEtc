@@ -135,6 +135,14 @@ internal static class WorkflowTests
             check(editor.ViewportHeight > 0 && lastLine.Bottom <= editor.ActualHeight && lastLine.Top >= 0, "Final source line remains reachable at minimum window height");
             if (screenshots is not null) Program.Screenshot(events, Path.Combine(screenshots, "long-preview-bottom.png"), 1280, 720,
                 () => { editor.ScrollToEnd(); summaryScroll.ScrollToBottom(); });
+
+            File.WriteAllText(Path.Combine(source, "Batch.cpp"), "#include \"Fixture.h\"\nvoid F::Batch(const TArray<int>& Items, bool Jump) { if (Jump) goto Work; if (!Items.IsEmpty()) { Work: for (auto Item : Items) Use(Item); } }");
+            Click(events, "AnalyzeButton"); Until(() => !events.IsBusy);
+            row = ((IEnumerable<CandidateRow>)grid.ItemsSource).Single();
+            check(!row.CanTrackActiveScopes && !row.IncludeActiveScope && row.QuantityEnabled, "Unsafe goto scopes keep safe input quantities but disable scope choices");
+            check(!eventPreview.Text.Contains("ON_SCOPE_EXIT") && ((Button)events.FindName("ApplyButton")).IsEnabled, "Safe goto preview can still be applied");
+            row.IncludeActiveScope = true; Until(() => !events.IsPreviewPending);
+            check(!((Button)events.FindName("ApplyButton")).IsEnabled && ((TextBlock)events.FindName("StatusText")).Text.Contains("goto"), "Manually forced unsafe scope is rejected inline");
         }
         finally { cpu.Close(); events.Close(); }
     }

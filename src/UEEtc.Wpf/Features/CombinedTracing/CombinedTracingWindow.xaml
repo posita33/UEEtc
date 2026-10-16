@@ -25,35 +25,34 @@
         <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <TextBox x:Name="SourcePath" Padding="8" VerticalContentAlignment="Center"
-                     ToolTip="Source フォルダーのフルパス。フォルダーをドロップできます。入力は次回も復元します。" TextChanged="InputsChanged" />
-            <Button x:Name="BrowseButton" Grid.Column="1" Content="フォルダーを選択…" Padding="12,6" Margin="8,0,0,0" Click="Browse_Click" />
+                     ToolTip="Source フォルダーのフルパス。フォルダーをドロップできます。入力は次回も復元します。" />
+            <Button x:Name="BrowseButton" Grid.Column="1" Content="フォルダーを選択…" Padding="12,6" Margin="8,0,0,0" />
         </Grid>
         <WrapPanel Grid.Row="2" Margin="0,0,0,12">
-            <ComboBox x:Name="CpuMacroOption" SelectedIndex="0" SelectionChanged="InputsChanged" Margin="0,0,12,0" VerticalAlignment="Center" ToolTip="通常形とSTRは同じ静的ID経路です。自動は安全なplain textを通常形、その他を固定文字列リテラルで生成します。">
+            <ComboBox x:Name="CpuMacroOption" SelectedIndex="0" Margin="0,0,12,0" VerticalAlignment="Center" ToolTip="通常形とSTRは同じ静的ID経路です。自動は安全なplain textを通常形、その他を固定文字列リテラルで生成します。">
                 <ComboBoxItem Content="マクロ：自動" /><ComboBoxItem Content="通常形（SCOPE）" /><ComboBoxItem Content="固定文字列（STR）" />
             </ComboBox>
-            <CheckBox x:Name="AllFunctionsOption" Content="全関数（互換）" IsChecked="False" Click="InputsChanged" VerticalAlignment="Center" Margin="0,0,12,0" ToolTip="通常はループ・データ処理・待機・複数処理を含む関数へ絞ります。実際の負荷は未測定です。" />
-            <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Padding="14,7" Margin="0,0,8,0" Click="Analyze_Click" />
-            <Button x:Name="CancelButton" Content="中止" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Cancel_Click" />
-            <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Export_Click" />
-            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="解析・プレビューを実行してください。" Click="Apply_Click" />
+            <CheckBox x:Name="AllFunctionsOption" Content="全関数（互換）" IsChecked="False" VerticalAlignment="Center" Margin="0,0,12,0" ToolTip="通常はループ・データ処理・待機・複数処理を含む関数へ絞ります。実際の負荷は未測定です。" />
+            <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Padding="14,7" Margin="0,0,8,0" />
+            <Button x:Name="CancelButton" Content="中止" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" />
+            <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" />
+            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="解析・プレビューを実行してください。" />
         </WrapPanel>
         <DockPanel Grid.Row="3" Margin="0,0,0,8">
             <TextBlock Text="検索" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                <Button x:Name="SelectAllButton" Content="全選択" Click="SelectAll_Click" Padding="8,4" Margin="8,0,0,0" />
-                <Button x:Name="ClearAllButton" Content="全解除" Click="ClearAll_Click" Padding="8,4" Margin="8,0,0,0" />
-                <Button x:Name="SelectRowsButton" Content="行を選択" Click="SelectRows_Click" Padding="8,4" Margin="8,0,0,0" ToolTip="強調表示した行を適用対象にします。Ctrl/Shiftで複数行、Spaceで切替。" />
-                <Button x:Name="ClearRowsButton" Content="行を解除" Click="ClearRows_Click" Padding="8,4" Margin="8,0,0,0" />
-                <Button x:Name="SelectVisibleButton" Content="表示中を選択" Click="SelectVisible_Click" Padding="8,4" Margin="8,0,0,0" />
-                <Button x:Name="ClearVisibleButton" Content="表示中を解除" Click="ClearVisible_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectAllButton" Content="全選択" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearAllButton" Content="全解除" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectRowsButton" Content="行を選択" Padding="8,4" Margin="8,0,0,0" ToolTip="強調表示した行を適用対象にします。Ctrl/Shiftで複数行、Spaceで切替。" />
+                <Button x:Name="ClearRowsButton" Content="行を解除" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectVisibleButton" Content="表示中を選択" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearVisibleButton" Content="表示中を解除" Padding="8,4" Margin="8,0,0,0" />
             </StackPanel>
-            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数名・判定理由を検索。フィルターで隠れた選択も適用対象です。" />
+            <TextBox x:Name="FilterText" Padding="6" ToolTip="パス・関数名・判定理由を検索。フィルターで隠れた選択も適用対象です。" />
         </DockPanel>
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions><ColumnDefinition Width="560" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Extended" SelectionUnit="FullRow"
-                      SelectionChanged="FileList_SelectionChanged" CanUserAddRows="False" EnableRowVirtualization="True">
+            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Extended" SelectionUnit="FullRow" CanUserAddRows="False" EnableRowVirtualization="True">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="適用" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSelect}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="28" />

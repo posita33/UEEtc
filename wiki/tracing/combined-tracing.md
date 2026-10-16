@@ -8,6 +8,8 @@ status: todo
 
 [目次](../README.md) / [各機能の付与ロジックとEngine参照](current-feature-logic.md) / [イベントの自動推奨](automatic-counter-preview.md)
 
+[Issue #47の監査とリファクタリング](engine-audit-and-refactoring.md)で、生成途中の挿入案と公開結果を分離し、CPU/統合画面の進行処理を共通化した。
+
 ## 操作
 
 メイン画面の「CPU・イベント統合付与」から新しいウィンドウを開く。
@@ -70,7 +72,7 @@ flowchart TD
 「C++を1つのパーサーで一度だけ解析する」という実装ではない。
 
 CPUをイベント付与後のコードへかけ直さない。生成したINCREMENT/ADD/ON_SCOPE_EXIT等が、CPUの負荷候補判定や元行番号に影響するのを避ける。
-[SourceInsertion](../../src/UEEtc.Core/Source/SourceInsertion.cs)に元ソース上の位置と挿入文字列を持ち、両機能の挿入を後ろから適用する。
+[SourceInsertion](../../src/UEEtc.Core/Source/SourceInsertion.cs)に元ソース上の位置と挿入文字列を持ち、[FileProposal](../../src/UEEtc.Core/Source/FileProposal.cs)として両機能の挿入案を統合してから、1回だけ文字列・バイト列化する。
 同じinclude挿入位置では決めた順番で連結し、既存の先頭includeを維持する。
 CPU側は旧関数進入カウンターを生成せず、イベント側の識別子割り当てと混在させない。
 
