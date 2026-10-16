@@ -19,6 +19,7 @@ src/
     SourceDocument.cs            文字コードと BOM を維持する読み書き
     CppLexer.cs                  C++ の字句と括弧・条件コンパイルの検査
     CppInstrumenter.cs           関数の候補抽出とマクロ挿入案
+    CounterNaming.cs             全候補・既存名を照合したカウンター識別子の割り当て
     InstrumentationService.cs    再帰探索と明示的な適用
     ReportExporter.cs            JSON、差分、加工済みコピーの出力
   UEEtc.Wpf/                    非同期解析、プレビュー、保存、適用
@@ -29,13 +30,14 @@ tests/
 scripts/
   Test-CppInstrumentation.ps1   MSVC で生成 C++ のコンパイル・実行確認
   Invoke-TraceExperiments.ps1   実プロジェクトの解析・再解析・元ファイル同一性検証
+  Measure-EngineTraceCounters.ps1 Engine のカウンター使用箇所のテキスト集計
 ```
 
 `InstrumentationService.Analyze()` は元ファイルを読み取るだけです。返される `AnalysisPlan` は、元のバイト列、加工後のバイト列、関数の判定理由、診断を保持します。書き込みを行う操作は `ReportExporter.Export()` と `InstrumentationService.Apply()` に分けました。
 
 ## 挿入するコード
 
-生成形式を示すための独自の短いサンプルです。実際の名前にはパス・シグネチャから求めた SHA-256 の先頭 16 桁が入り、オーバーロードを区別します。行番号をキーにしないため、挿入により行がずれても名前が変わりません。相対パスを求める起点は解析対象フォルダーです。
+生成形式を示すための独自の短いサンプルです。通常のカウンター識別子は `<namespace・クラス名・関数名>_CallCount` です。`AExample::Work` は `AExample_Work_CallCount` となります。全候補の基本名と既存の識別子を照合し、衝突する場合だけパス・シグネチャ由来の SHA-256 の先頭 16 桁を付けます。固定の `UEEtcCalls_` 接頭辞は付けません。詳細と実測結果は [命名調査](counter-naming.md) を参照してください。
 
 例: `Source/Example/Example.cpp`
 
@@ -45,7 +47,7 @@ scripts/
 #include "ProfilingDebugging/CountersTrace.h"
 
 namespace {
-    TRACE_DECLARE_ATOMIC_INT_COUNTER(UEEtcCalls_0123456789ABCDEF,
+    TRACE_DECLARE_ATOMIC_INT_COUNTER(AExample_Work_CallCount,
         TEXT("UEEtc/Example/Example.cpp/AExample::Work [0123456789ABCDEF]/Calls"));
 }
 
@@ -53,12 +55,24 @@ void AExample::Work()
 {
     TRACE_CPUPROFILER_EVENT_SCOPE_STR(
         "UEEtc/Example/Example.cpp/AExample::Work [0123456789ABCDEF]");
-    TRACE_COUNTER_INCREMENT(UEEtcCalls_0123456789ABCDEF);
+    TRACE_COUNTER_INCREMENT(AExample_Work_CallCount);
     DoWork();
 }
 ```
 
 STR には固定のリテラルを渡します。カウンターは関数のローカル自動変数として毎回作る構成にはせず、翻訳単位で保持します。条件コンパイルの代替枝に同一シグネチャの関数がある場合、宣言は共有します。元のソースは文字列の挿入以外で整形しません。
+
+### 無名 namespace の理由
+
+`TRACE_COUNTER_INCREMENT` の引数は文字列ではなく、宣言したカウンターの識別子です。Unreal Insights に表示する名前は宣言の `TEXT("...")` に渡します。今回の変更は識別子の可読性を改善するもので、表示名と CPU スコープのラベルは維持します。
+
+UE 5.8 の `TRACE_DECLARE_ATOMIC_INT_COUNTER` は最終的に `FCountersTrace::FCounterAtomicInt __GTraceCounter<識別子>(...)` という変数を定義します。生成するカウンターを外部に公開する必要がないため、無名 namespace に入れて内部リンケージにしています。他の翻訳単位とリンクするときのシンボル衝突も抑えられます。この namespace はマクロ自体の必須構文ではなく、生成変数の公開範囲を限定する実装上の選択です。
+
+ただし、同じ翻訳単位に現れる無名 namespace は同じ名前空間を指します。UE の Unity Build で複数の `.cpp` が一つにまとめられた場合、無名 namespace だけでは名前の重複を防げません。そのため、解析対象フォルダー全体で候補名を照合し、衝突する名前にハッシュを付けます。[C++ 作業草案の無名 namespace の定義](https://eel.is/c++draft/namespace.unnamed)も参照してください。
+
+カウンターの値が関数呼び出しごとに初期化されないのは、関数外で定義した変数に静的記憶域期間があるためです。無名 namespace にその役割があるわけではありません。atomic 版は、複数スレッドからの increment で値のデータ競合を避けるために使います。
+
+以前の名前で計測済みの関数は、既存計測をスキップするため自動では改名しません。新しい名前を試す場合は、未加工のソースからプレビュー・加工済みコピーを再生成してください。衝突回避の範囲は選択したフォルダー内です。別フォルダーで個別に解析したファイルを後から同じ Unity Build に混ぜるときは、共通の親からまとめて解析してください。
 
 ## WPF
 

@@ -34,11 +34,14 @@ foreach ($target in @(@{ Name = 'lyra'; Root = $LyraSource }, @{ Name = 'blockbr
     $difference = @(Compare-Object $before $after -Property Path,Hash)
     if ($difference.Count -ne 0) { throw "Source integrity check failed: $($target.Name)" }
     $report = Get-Content (Join-Path $output 'report.json') -Raw -Encoding utf8 | ConvertFrom-Json
+    $counters = @($report.Files.Functions | Where-Object { $_.Status -eq 'Add' -and $_.Counter } | Select-Object -ExpandProperty Counter -Unique)
+    $hashedCounters = @($counters | Where-Object { $_ -match '_CallCount_[0-9A-F]{16}(?:_\d+)?$' })
     [pscustomobject]@{
         Name = $target.Name; SourceFiles = $before.Count; CppFiles = $report.Files.Count
         ChangedFiles = $report.ChangedFiles; AddedFunctions = $report.AddedFunctions
         SkippedFunctions = $report.SkippedFunctions; Diagnostics = $report.DiagnosticCount
         SecondPassChanges = $secondPlan.ChangedFiles; OriginalFileChanges = $difference.Count
+        UniqueGeneratedCounters = $counters.Count; HashedCounters = $hashedCounters.Count
     } | ConvertTo-Json | Set-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8
     Get-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8
 }
