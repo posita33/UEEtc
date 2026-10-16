@@ -20,7 +20,7 @@ internal static class Program
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
         string parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "UEEtc-ui-tests")) + Path.DirectorySeparatorChar;
         string root = Path.Combine(parent, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
-        const string source = "#include \"Fixture.h\"\nvoid F::Work() { if (bCacheHit) { Hit(); } else { Miss(); } }\n";
+        const string source = "#include \"Fixture.h\"\nvoid F::Work() { Super::Work(); if (bCacheHit) { Hit(); } else { Miss(); } }\n";
         File.WriteAllText(Path.Combine(root, "Fixture.cpp"), source, new UTF8Encoding(false));
         var home = new MainWindow();
         try
@@ -37,6 +37,8 @@ internal static class Program
             var cpuFile = (FileAnalysis)((DataGrid)cpu.FindName("FileList")).SelectedItem;
             Assert(cpuFile.AddedCpuScopes == 1 && cpuFile.AddedCallCounters == 0, "CPU adds scopes only");
             Assert(!cpuFile.ProposedText.Contains("TRACE_COUNTER_INCREMENT"), "CPU never inserts event counts");
+            Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"F Work\")"), "CPU label is class and function");
+            Assert(cpuFile.ProposedText.IndexOf("Super::Work();", StringComparison.Ordinal) < cpuFile.ProposedText.IndexOf("TRACE_CPUPROFILER", StringComparison.Ordinal), "CPU starts after Super");
             Assert(FindButton(cpu, "ApplyButton").IsEnabled, "CPU valid preview can be applied");
             cpuPath.Text += "-changed";
             Assert(!FindButton(cpu, "ApplyButton").IsEnabled && !FindButton(cpu, "ExportButton").IsEnabled, "CPU path invalidates preview");

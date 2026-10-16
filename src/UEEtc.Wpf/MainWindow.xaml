@@ -9,7 +9,7 @@
             <Button x:Name="CpuFeatureButton" Click="OpenCpu_Click" HorizontalContentAlignment="Left" Padding="20" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="CPU スコープ付与" FontSize="20" FontWeight="SemiBold" />
-                    <TextBlock Text="関数全体の実行時間を計測するマクロを付与します。" Margin="0,8,0,0" />
+                    <TextBlock Text="関数の処理時間を計測します。Super 呼び出し後にも対応。" Margin="0,8,0,0" />
                 </StackPanel>
             </Button>
             <Button x:Name="EventFeatureButton" Click="OpenEvents_Click" HorizontalContentAlignment="Left" Padding="20">

@@ -11,7 +11,9 @@ Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジ
 
 現在は C++ ソースへの Trace マクロ付与ツールを実装しています。WPF のメイン画面から「CPU スコープ付与」と「イベントカウンター付与」を別画面で開けます。解析・レポート保存では元ソースを変更しません。
 
-CPU は関数全体の時間を計測します。イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択した場所にだけ追加します。候補はすべて初期選択オフです。[Engine の用途調査・現行の使い方と構成](wiki/tracing/event-counters.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
+CPU のラベルは「クラス名 関数名」です。対応する `Super::同じ関数名(...)` がある場合はその後から計測し、安全な配置を判断できない構文は理由を表示します。[CPU の名前・計測範囲](wiki/tracing/cpu-scope-policy.md)を参照してください。
+
+イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択した場所にだけ追加します。候補はすべて初期選択オフです。[Engine の用途調査・現行の使い方と構成](wiki/tracing/event-counters.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
@@ -93,6 +95,7 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 # MSVC x64 の C++ ツールが必要
 ./scripts/Test-CppInstrumentation.ps1
 ./scripts/Test-EventCounters.ps1
+./scripts/Test-CpuScopePolicy.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1

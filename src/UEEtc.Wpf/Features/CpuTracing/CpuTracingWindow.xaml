@@ -17,7 +17,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="CPU スコープ付与" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="関数全体の時間を計測します。イベントカウンターはメイン画面から別機能として開いてください。解析・保存では元ソースを変更しません。"
+            <TextBlock Text="対応する Super 呼び出しがあればその後を計測します。ラベルは「クラス名 関数名」です。解析・保存では元ソースを変更しません。"
                        Margin="0,8,0,12" TextWrapping="Wrap" />
         </StackPanel>
         <Grid Grid.Row="1" Margin="0,0,0,10">
