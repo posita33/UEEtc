@@ -2,6 +2,7 @@ param(
     [string]$LyraSource = 'D:/Projects/posita/UE/R_A_D/LyraStarterGame/Source',
     [string]$BlockBreakerSource = 'D:/Projects/posita/git/Game/BlockBreaker/Source',
     [switch]$RecommendedAdd,
+    [switch]$RecommendedCounters,
     [ValidateSet('Cumulative','ActiveScope')][string]$Measurement = 'Cumulative'
 )
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,7 @@ $runRoot = Join-Path $repoRoot ('artifacts/event-experiments/' + (Get-Date -Form
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 $cli = Join-Path $repoRoot 'src/UEEtc.Console/bin/Release/net10.0/UEEtc.Console.dll'
 [string[]]$quantityFlags = @(); if ($RecommendedAdd) { $quantityFlags = @('--recommended-add') }
+if ($RecommendedCounters) { $quantityFlags = @('--recommended-counters') }
 function Manifest([string]$Root) {
     @(Get-ChildItem -LiteralPath $Root -Recurse -File | Sort-Object FullName | ForEach-Object {
         [pscustomobject]@{ Path = $_.FullName; Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }

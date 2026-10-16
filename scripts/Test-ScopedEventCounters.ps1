@@ -23,7 +23,9 @@ int Track(int depth, int action) {
 @'
 #pragma once
 #include <atomic>
+#include <cwchar>
 inline std::atomic<int> Live{0}, Peak{0}, Entries{0}, Exits{0};
+inline int Cumulative = 0;
 inline int Errors = 0;
 #define TEXT(value) L##value
 struct LocalLifetime {
@@ -38,6 +40,7 @@ int main() {
     if (Exits != TEST_COUNTER_ENABLED * TEST_ACTIVE_SCOPE * 7) return 6;
     if (Live != (TEST_COUNTER_ENABLED && !TEST_ACTIVE_SCOPE ? 7 : 0)) return 7;
     if (Peak != TEST_COUNTER_ENABLED * (TEST_ACTIVE_SCOPE ? 3 : 7)) return 8;
+    if (Cumulative != TEST_COUNTER_ENABLED * TEST_COMPANION * 7) return 9;
     return 0;
 }
 '@ | Set-Content (Join-Path $stubs 'Fixture.h') -Encoding utf8
@@ -45,8 +48,9 @@ int main() {
 #pragma once
 #if TEST_COUNTER_ENABLED
 struct Counter {
-    explicit Counter(const wchar_t*) {}
-    void Increment() { ++Entries; int current = ++Live; int peak = Peak.load(); while (current > peak && !Peak.compare_exchange_weak(peak, current)) {} }
+    bool IsCumulative;
+    explicit Counter(const wchar_t* display) : IsCumulative(TEST_COMPANION && !std::wcsstr(display, L"ActiveScopes")) {}
+    void Increment() { if (IsCumulative) { ++Cumulative; return; } ++Entries; int current = ++Live; int peak = Peak.load(); while (current > peak && !Peak.compare_exchange_weak(peak, current)) {} }
     void Decrement() { ++Exits; --Live; }
 };
 #define TRACE_DECLARE_ATOMIC_INT_COUNTER(Name, Display) Counter __GTraceCounter##Name(Display);
@@ -71,9 +75,9 @@ if ($env:VSCMD_ARG_TGT_ARCH -ne 'x64' -or !(Get-Command cl.exe -ErrorAction Sile
     Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
     Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
 }
-foreach ($measurement in @('Cumulative','ActiveScope')) {
+foreach ($measurement in @('Cumulative','ActiveScope','Companion')) {
     $selection = Get-Content (Join-Path $discovery 'selection.json') -Raw -Encoding utf8 | ConvertFrom-Json
-    $selection.Selections = @([pscustomobject]@{ Id=$candidate.Id; CounterName='Metric'; DisplayName="Track $measurement"; Measurement=$measurement })
+    $selection.Selections = @([pscustomobject]@{ Id=$candidate.Id; CounterName='Metric'; DisplayName="Track $measurement"; Measurement=$(if ($measurement -eq 'Companion') { 'Cumulative' } else { $measurement }); IncludeActiveScope=($measurement -eq 'Companion') })
     $selectionFile = Join-Path $runRoot "$measurement.json"
     $selection | ConvertTo-Json -Depth 6 | Set-Content $selectionFile -Encoding utf8
     $output = Join-Path $runRoot $measurement
@@ -82,10 +86,11 @@ foreach ($measurement in @('Cumulative','ActiveScope')) {
     git -C $source apply --check (Join-Path $output 'changes.patch')
     if ($LASTEXITCODE -ne 0) { throw 'Patch check failed.' }
     foreach ($enabled in @(0,1)) {
-        $active = [int]($measurement -eq 'ActiveScope')
+        $active = [int]($measurement -ne 'Cumulative')
+        $companion = [int]($measurement -eq 'Companion')
         $tag = "$measurement-$enabled"
         $exe = Join-Path $runRoot "$tag.exe"
-        & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTEST_COUNTER_ENABLED=$enabled" "/DTEST_ACTIVE_SCOPE=$active" "/I$stubs" "/Fo$(Join-Path $runRoot "$tag.obj")" "/Fe$exe" (Join-Path $output 'modified/Fixture.cpp')
+        & cl.exe /nologo /std:c++20 /EHsc /W4 /WX /utf-8 "/DTEST_COUNTER_ENABLED=$enabled" "/DTEST_ACTIVE_SCOPE=$active" "/DTEST_COMPANION=$companion" "/I$stubs" "/Fo$(Join-Path $runRoot "$tag.obj")" "/Fe$exe" (Join-Path $output 'modified/Fixture.cpp')
         if ($LASTEXITCODE -ne 0) { throw "Compile failed: $tag" }
         & $exe
         if ($LASTEXITCODE -ne 0) { throw "Counter balance / reentrancy / unwinding failed: $tag ($LASTEXITCODE)" }

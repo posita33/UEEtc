@@ -10,6 +10,7 @@ public sealed record FunctionAnalysis(string Name, int Line, string Status, stri
     public bool CallCounterAdded { get; init; }
     public bool EventCounterAdded { get; init; }
     public bool DecrementAdded { get; init; }
+    public string? ActiveScopeCounter { get; init; }
     public string? CounterMeasurement { get; init; }
     public string? QuantityCounter { get; init; }
     public string? QuantityValue { get; init; }

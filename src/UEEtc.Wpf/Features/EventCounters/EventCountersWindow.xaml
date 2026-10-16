@@ -10,7 +10,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="イベントカウンター付与" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="解析して変更案を確認し、一覧で適用するファイルを選びます。詳細タブで候補を除外できます。推奨ADDは入力数量として自動追加します。" TextWrapping="Wrap" Margin="0,8,0,12" />
+            <TextBlock Text="「解析・プレビュー」でADDとスコープDECREMENTの適切な箇所を自動設定します。追加内容と判断理由を確認し、適用するファイルを選んでください。" TextWrapping="Wrap" Margin="0,8,0,12" />
         </StackPanel>
         <DockPanel Grid.Row="1" Margin="0,0,0,10">
             <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="フォルダーを選択…" Click="Browse_Click" Padding="12,6" Margin="8,0,0,0" />
@@ -51,10 +51,15 @@
             </DataGrid>
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" />
             <TabControl Grid.Column="2">
-                <TabItem Header="付与後プレビュー"><preview:CodeChangePreview x:Name="PreviewText" /></TabItem>
+                <TabItem Header="付与後プレビュー">
+                    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" MaxHeight="160" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PreviewSummary" TextWrapping="Wrap" Margin="8" /></ScrollViewer>
+                        <preview:CodeChangePreview x:Name="PreviewText" Grid.Row="1" />
+                    </Grid>
+                </TabItem>
                 <TabItem Header="付与前"><TextBox x:Name="OriginalText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
                 <TabItem Header="候補の位置・数える内容"><TextBox x:Name="ContextText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
-                <TabItem x:Name="QuantityTab" Header="候補・名前・数量ADD">
+                <TabItem x:Name="QuantityTab" Header="候補・詳細設定">
                     <Grid><Grid.RowDefinitions><RowDefinition Height="160" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <DataGrid x:Name="CandidateList" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single" SelectionChanged="CandidateSelected">
                             <DataGrid.Columns>
@@ -65,11 +70,16 @@
                                 <DataGridTextColumn Header="関数" Binding="{Binding Candidate.Function}" IsReadOnly="True" Width="170" />
                                 <DataGridTextColumn Header="分岐" Binding="{Binding Candidate.Branch}" IsReadOnly="True" Width="55" />
                                 <DataGridTextColumn Header="条件" Binding="{Binding Candidate.Condition}" IsReadOnly="True" Width="200" />
-                                <DataGridTextColumn Header="推奨ADD" Binding="{Binding Candidate.RecommendedQuantity.Value}" IsReadOnly="True" Width="140" />
+                                <DataGridTextColumn Header="付与するマクロ" Binding="{Binding PlannedMacros}" IsReadOnly="True" Width="300" />
                             </DataGrid.Columns>
                         </DataGrid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="QuantityEditor" Margin="10" DataContext="{Binding SelectedItem, ElementName=CandidateList}" IsEnabled="False">
+                            <TextBlock Text="解析時に自動設定済みです。通常は付与後プレビューで変更内容を確認するだけで利用できます。" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding AutomaticDecision}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding PlannedMacros}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,12" />
+                            <Expander x:Name="AdvancedOptions" Header="詳細設定（自動設定を変更する場合）" IsExpanded="False"><StackPanel Margin="0,10,0,0">
+                            <CheckBox Content="累積回数とは別にスコープ現在数を追加（退出時にDECREMENT）" IsChecked="{Binding IncludeActiveScope}" Margin="0,0,0,8" />
                             <CheckBox Content="この分岐のスコープ現在数（退出時に DECREMENT）" IsChecked="{Binding TrackActiveScopes}" Margin="0,0,0,8" />
                             <TextBlock Text="標準は累積進入回数です。現在数はこの分岐の入口から退出までを数え、returnでも減少します。非同期要求やオブジェクトの生存数とは異なります。" TextWrapping="Wrap" Margin="0,0,0,10" />
                             <TextBlock Text="回数カウンターの識別子" /><TextBox Text="{Binding CounterName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8" />
@@ -85,6 +95,7 @@
                             <TextBlock Text="単位（bytes / items 等）" /><TextBox Text="{Binding QuantityUnit, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8" />
                             <CheckBox Content="値の意味・単位・この分岐で加算する意味を確認した" IsChecked="{Binding MeaningConfirmed}" />
                             <TextBlock Text="適用の選択・数量の手入力・確認状態は復元しません。解析時には推奨を新しく提示します。値や単位を編集したら確認し直してください。" TextWrapping="Wrap" Margin="0,8" />
+                            </StackPanel></Expander>
                         </StackPanel>
                     </ScrollViewer>
                     </Grid>

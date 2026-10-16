@@ -6,6 +6,8 @@ status: todo
 
 # ファイル選択・数量の自動追加・短い表示名（Issue #27〜#30）
 
+最新の操作とADD・別スコープDECREMENTの自動設定は [Issue #35](automatic-counter-preview.md) を参照してください。以下のタブ名は実装当時の記録です。
+
 累積回数とスコープ現在数の切替、DECREMENTの条件は [Issue #32 の追加実装](cpu-macros-and-counter-lifetimes.md) を参照してください。
 
 [目次](../README.md) / [変更プレビューとインデント](preview-selection-and-indentation.md)
