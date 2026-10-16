@@ -14,10 +14,11 @@ static int Run(string[] arguments)
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
         Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--all-functions] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("cpu defaults to static-evidence filtering (loops, known data/wait APIs, 4+ action calls). Cost is not measured. --all-functions retains broad instrumentation.");
-        Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--recommended-add] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("counters: discover braced if/else branches; select none by default. --report exports candidates.json and an empty selection.json.");
         Console.WriteLine("Copy reviewed Id / CounterName / DisplayName into Selections; --selection validates the source fingerprint before preview/apply.");
         Console.WriteLine("Optional Quantity: { CounterName, DisplayName, Value, Unit, MeaningConfirmed: true }. Value: listed AddValues or decimal uint32 constant. Count and quantity are separate metrics.");
+        Console.WriteLine("--recommended-add adds recommended input quantities to reviewed selections without a manual Quantity. Known const UE array Num() values are supported. Input quantities are not successes or completed work.");
         Console.WriteLine("CPU and event counters are separate features. Counters measure selected branch entries, not inferred successes.");
         Console.WriteLine("Legacy entry-count commands (retained for existing scripts):");
         Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only | --both] [--report <output-full-path>] [--apply]");
@@ -96,7 +97,7 @@ static int Run(string[] arguments)
 static int RunCounters(string[] arguments, CancellationToken cancellation)
 {
     if (arguments.Length == 0) throw new ArgumentException("ソースフォルダーのフルパスを指定してください。");
-    string root = arguments[0]; string? report = null, selectionPath = null; bool apply = false;
+    string root = arguments[0]; string? report = null, selectionPath = null; bool apply = false, recommendedAdd = false;
     for (int i = 1; i < arguments.Length; i++)
     {
         switch (arguments[i])
@@ -104,6 +105,7 @@ static int RunCounters(string[] arguments, CancellationToken cancellation)
             case "--report" when report is null && i + 1 < arguments.Length: report = arguments[++i]; break;
             case "--selection" when selectionPath is null && i + 1 < arguments.Length: selectionPath = arguments[++i]; break;
             case "--apply" when !apply: apply = true; break;
+            case "--recommended-add" when !recommendedAdd: recommendedAdd = true; break;
             default: throw new ArgumentException("Unknown or duplicate option: " + arguments[i]);
         }
     }
@@ -113,6 +115,12 @@ static int RunCounters(string[] arguments, CancellationToken cancellation)
     var selection = selectionPath is null ? service.CreateSelection(scan) :
         JsonSerializer.Deserialize<EventCounterSelectionFile>(File.ReadAllText(selectionPath), EventCounterService.JsonOptions)
             ?? throw new ArgumentException("選択ファイルが空です。");
+    if (selection.Selections is null || selection.Selections.Any(s => s is null)) throw new ArgumentException("Selections に有効な選択一覧が必要です。");
+    if (recommendedAdd)
+    {
+        var candidates = scan.Candidates.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        selection = selection with { Selections = selection.Selections.Select(s => s.Quantity is null && candidates.TryGetValue(s.Id, out var c) && c.RecommendedQuantity is { } q ? s with { Quantity = q.CreateInputSelection(c) } : s).ToArray() };
+    }
     var plan = service.BuildPlan(scan, selection, cancellation);
     Console.WriteLine($"イベント候補 {scan.Candidates.Count} / 選択 {selection.Selections.Count}");
     Console.WriteLine(ReportExporter.Summary(plan));

@@ -1,4 +1,4 @@
-param([switch]$Quantity)
+param([switch]$Quantity, [switch]$Batch)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/event-cpp/' + [guid]::NewGuid().ToString('N'))
@@ -6,6 +6,7 @@ $sourceDir = Join-Path $runRoot 'source'
 $stubDir = Join-Path $runRoot 'stubs'
 New-Item -ItemType Directory -Path $sourceDir,(Join-Path $stubDir 'ProfilingDebugging') -Force | Out-Null
 $utf8 = [System.Text.UTF8Encoding]::new($false)
+if ($Batch) { $Quantity = $true }
 [System.IO.File]::WriteAllText((Join-Path $sourceDir 'Fixture.cpp'), @'
 #include "Fixture.h"
 int Work(int value, unsigned int Size) {
@@ -23,9 +24,17 @@ int main() {
     return 0;
 }
 '@, $utf8)
+if ($Batch) {
+    $fixturePath = Join-Path $sourceDir 'Fixture.cpp'
+    $fixture = [System.IO.File]::ReadAllText($fixturePath).Replace('unsigned int Size', 'const TArray<int>& Requests').Replace('static_cast<int>(Size)', 'Requests.Num()')
+    $fixture = $fixture.Replace('Work(1, 2)', 'Work(1, TArray<int>{2})').Replace('Work(0, 7)', 'Work(0, TArray<int>{7})').Replace('Work(-1, 0)', 'Work(-1, TArray<int>{0})')
+    $fixture = $fixture.Replace('return value + Requests.Num();', 'int total = 0; for (int i = 0; i < Requests.Num(); ++i) { ++total; } return value + total;').Replace('? 9 : 0', '? 2 : 0')
+    [System.IO.File]::WriteAllText($fixturePath, $fixture, $utf8)
+}
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'Fixture.h'), @'
 #pragma once
 #include <atomic>
+template<class T> struct TArray { int Count; int Num() const { return Count; } };
 inline int CounterTotal = 0;
 inline unsigned long long QuantityTotal = 0;
 #define TEXT(value) L##value
@@ -56,7 +65,7 @@ $candidates = Get-Content (Join-Path $discovery 'candidates.json') -Raw -Encodin
 $selection = Get-Content (Join-Path $discovery 'selection.json') -Raw -Encoding utf8 | ConvertFrom-Json
 $selection.Selections = @($candidates | Where-Object Function -eq 'Work' | ForEach-Object {
     $row = [pscustomobject]@{ Id = $_.Id; CounterName = $_.SuggestedName; DisplayName = $_.DisplayName }
-    if ($Quantity) {
+    if ($Quantity -and !$Batch) {
         $amount = if ($_.AddValues -contains 'Size') { 'Size' } elseif ($_.Branch -eq 'If') { '7' } else { '0' }
         $row | Add-Member Quantity ([pscustomobject]@{ CounterName = $_.SuggestedName + 'Quantity'; DisplayName = $_.DisplayName + '/Quantity'; Value = $amount; Unit = 'items'; MeaningConfirmed = $true })
     }
@@ -66,8 +75,13 @@ if ($selection.Selections.Count -ne 3) { throw 'Expected three Work branches.' }
 $selectionPath = Join-Path $runRoot 'reviewed-selection.json'
 $selection | ConvertTo-Json -Depth 6 | Set-Content $selectionPath -Encoding utf8
 $output = Join-Path $runRoot 'selected'
-dotnet $cli counters $sourceDir --selection $selectionPath --report $output
+[string[]]$automaticFlags = @(); if ($Batch) { $automaticFlags = @('--recommended-add') }
+dotnet $cli counters $sourceDir --selection $selectionPath @automaticFlags --report $output
 if ($LASTEXITCODE -ne 0) { throw 'Selected preview failed.' }
+if ($Batch) {
+    $batchReport = Get-Content (Join-Path $output 'report.json') -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($batchReport.AddedQuantityCounters -ne 1) { throw 'Expected automatic quantity only in the branch that processes the batch.' }
+}
 git -C $sourceDir apply --check (Join-Path $output 'changes.patch')
 if ($LASTEXITCODE -ne 0) { throw 'Patch check failed.' }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'

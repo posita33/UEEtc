@@ -57,22 +57,40 @@ internal static class Program
             var events = home.OwnedWindows.OfType<EventCountersWindow>().Single();
             Assert(events.Owner == home && events != (Window)cpu, "Events open in independent window");
             var eventPath = (TextBox)events.FindName("SourcePath"); var analyze = FindButton(events, "AnalyzeButton");
-            eventPath.Text = root; analyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            eventPath.Text = root;
+            var oldCandidate = new UEEtc.Core.Features.EventCounters.EventCounterService().Analyze(root).Candidates[0];
+            string oldScope = "EventCounters.Edits." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(root.ToUpperInvariant()))) + "." + oldCandidate.Id + ".Display";
+            settings.Set(oldScope, "UEEtc/Events/" + oldCandidate.RelativePath + "/" + oldCandidate.Function + "/If1");
+            analyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert(!eventPath.IsEnabled, "Events lock inputs during analysis"); Wait(analyze);
             var list = (DataGrid)events.FindName("CandidateList");
+            var eventFiles = (DataGrid)events.FindName("FileList");
+            var eventFile = ((IEnumerable<EventFileRow>)eventFiles.ItemsSource).Single();
             var rows = ((IEnumerable<CandidateRow>)list.ItemsSource).ToArray();
-            Assert(rows.Length == 2 && rows.All(r => !r.Selected), "Two branch candidates, none selected");
+            Assert(rows[0].DisplayName == "F Work if1", "Saved generated path label migrates to the short default");
+            Assert(rows.Length == 2 && rows.All(r => r.Selected) && !eventFile.Selected, "Two included branches in an unselected file");
             Assert(ReferenceEquals(((FrameworkElement)events.FindName("QuantityEditor")).DataContext, rows[0]), "Quantity editor binds the highlighted candidate");
             Assert(!FindButton(events, "ApplyButton").IsEnabled, "Discovery cannot be applied");
             Assert(((TextBox)events.FindName("ContextText")).Text.Contains("bCacheHit"), "Candidate context includes condition");
-            rows[0].Selected = true; rows[0].CounterName = "VerifiedCacheHitCount"; rows[0].DisplayName = "Cache/VerifiedHits";
+            eventFile.Selected = true; rows[1].Selected = false; rows[0].CounterName = "VerifiedCacheHitCount"; rows[0].DisplayName = "Cache/VerifiedHits";
             var previewButton = FindButton(events, "PreviewButton"); previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
             string preview = ((CodeChangePreview)events.FindName("PreviewText")).Text;
             Assert(preview.Contains("TRACE_COUNTER_INCREMENT(VerifiedCacheHitCount)"), "Selected name reaches preview");
             Assert(preview.Split("TRACE_COUNTER_INCREMENT").Length == 2, "Only selected branch added");
             Assert(!preview.Contains("CpuProfilerTrace.h"), "Events do not add CPU tracing");
             Assert(FindButton(events, "ApplyButton").IsEnabled && FindButton(events, "ExportButton").IsEnabled, "Reviewed plan enables apply/export");
-            rows[0].QuantityEnabled = true; rows[0].QuantityName = "TransferredItems";
+            int inputExceptions = 0;
+            EventHandler<System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs> observe = (_, e) => { if (e.Exception is ArgumentException && e.Exception.StackTrace?.Contains("EventCounterService", StringComparison.Ordinal) == true) inputExceptions++; };
+            AppDomain.CurrentDomain.FirstChanceException += observe;
+            try
+            {
+                rows[0].QuantityEnabled = true;
+                previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
+                Assert(!FindButton(events, "ApplyButton").IsEnabled && ((TextBlock)events.FindName("StatusText")).Text.Contains("単位"), "Enabling blank ADD requests missing input inline");
+                Assert(inputExceptions == 0, "Blank ADD never throws an ArgumentException, even before catch");
+            }
+            finally { AppDomain.CurrentDomain.FirstChanceException -= observe; }
+            rows[0].QuantityName = "TransferredItems";
             rows[0].QuantityDisplay = "Cache/Items"; rows[0].QuantityValue = "4";
             rows[0].QuantityUnit = "items"; rows[0].MeaningConfirmed = true;
             Assert(((ComboBox)events.FindName("QuantityValueInput")).Text == "4", "Quantity value binding reflects edited model");
@@ -80,10 +98,10 @@ internal static class Program
             previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
             Assert(((CodeChangePreview)events.FindName("PreviewText")).Text.Contains("TRACE_COUNTER_ADD(TransferredItems, 4)"), "Quantity reaches generated preview");
             ((TextBox)events.FindName("FilterText")).Text = "does-not-match";
-            Assert(list.Items.Count == 0 && rows[0].Selected, "Filtering does not change selection");
+            Assert(eventFiles.Items.Count == 0 && eventFile.Selected, "Filtering files does not change selection");
             ((TextBox)events.FindName("FilterText")).Text = "";
-            Assert(list.Items.Count == 2, "Clearing filter restores candidates");
-            list.SelectedItem = rows[0];
+            Assert(eventFiles.Items.Count == 1, "Clearing filter restores file row");
+            eventFiles.SelectedItem = eventFile;
             if (args.Length > 0)
             {
                 Directory.CreateDirectory(args[0]);
@@ -104,7 +122,7 @@ internal static class Program
                 restartAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(restartAnalyze);
                 var restartedRows = ((IEnumerable<CandidateRow>)((DataGrid)restarted.FindName("CandidateList")).ItemsSource).ToArray();
                 Assert(restartedRows[0].CounterName == "ChangedName" && restartedRows[0].DisplayName == "Cache/VerifiedHits", "Edited candidate names are restored");
-                Assert(restartedRows.All(r => !r.Selected) && !FindButton(restarted, "ApplyButton").IsEnabled, "Restart never restores selected sites or an applicable plan");
+                Assert(((IEnumerable<EventFileRow>)((DataGrid)restarted.FindName("FileList")).ItemsSource).All(f => !f.Selected) && !FindButton(restarted, "ApplyButton").IsEnabled, "Restart never restores selected files or an applicable plan");
                 Assert(restartedRows.All(r => !r.QuantityEnabled && !r.MeaningConfirmed), "Restart requires fresh quantity confirmation");
             }
             finally { restarted.Close(); }
