@@ -269,7 +269,7 @@ public sealed class EventCounterService
             var doc = SourceDocument.Read(file.OriginalBytes);
             var syntax = new CppStructure(doc.Text);
             string newline = doc.Text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-            var edits = new List<(int Position, string Text)>();
+            var edits = new List<SourceInsertion>();
             var rows = new List<FunctionAnalysis>();
             var declarations = new List<string>();
             string unit = SourceIndentation.Unit(doc.Text);
@@ -298,7 +298,7 @@ public sealed class EventCounterService
                     declarations.Add(unit + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + quantityName + ", TEXT(\"" + Escape(quantityDisplay) + "\"));");
                     insert += c.Indent + "TRACE_COUNTER_ADD(" + quantityName + ", " + q.Value + ");" + newline;
                 }
-                edits.Add((c.Position, insert));
+                edits.Add(new(c.Position, insert));
                 rows.Add(new(c.Function, c.Line, "Add", c.Reason, name) { EventCounterAdded = true, DecrementAdded = s.Measurement == CounterMeasurement.ActiveScope || s.IncludeActiveScope,
                     ActiveScopeCounter = s.IncludeActiveScope ? assigned[s.Id + "_Scope"] : null,
                     CounterMeasurement = s.Measurement.ToString(), CounterDecision = c.Branch + ": " + c.Condition + (s.Measurement == CounterMeasurement.ActiveScope ? " / 分岐スコープ現在数（退出時に減少）" : " / 累積進入回数") + (s.IncludeActiveScope ? " + 別の分岐スコープ現在数（退出時に減少）" : ""),
@@ -307,11 +307,9 @@ public sealed class EventCounterService
             string header = syntax.HasCounterInclude ? "" : "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
             if (selected.Any(s => s.Measurement == CounterMeasurement.ActiveScope || s.IncludeActiveScope) && !syntax.HasScopeExitInclude) header += "#include \"Misc/ScopeExit.h\"" + newline;
             if (syntax.IncludeAnchor > 0 && doc.Text[syntax.IncludeAnchor - 1] != '\n') header = newline + header;
-            edits.Add((syntax.IncludeAnchor, header + newline + "namespace {" + newline + string.Join(newline, declarations) + newline + "}" + newline));
-            var output = new StringBuilder(doc.Text);
-            foreach (var edit in edits.OrderByDescending(e => e.Position)) output.Insert(edit.Position, edit.Text);
-            string text = output.ToString();
-            return file with { Functions = rows, ProposedText = text, ProposedBytes = doc.Encode(text) };
+            edits.Add(new(syntax.IncludeAnchor, header + newline + "namespace {" + newline + string.Join(newline, declarations) + newline + "}" + newline));
+            string text = SourceInsertion.Apply(doc.Text, edits);
+            return file with { Functions = rows, ProposedText = text, ProposedBytes = doc.Encode(text), Insertions = edits };
         }).ToArray();
         return scan.Snapshot with { Files = files, RequiresQuantityConfirmation = requested.Any(s => s.Quantity is { MeaningConfirmed: false }) };
     }

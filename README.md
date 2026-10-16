@@ -9,7 +9,7 @@ UEいろいろコード
 
 Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジトリです。
 
-現在は C++ ソースへの Trace マクロ付与ツールを実装しています。WPF のメイン画面から「CPU スコープ付与」と「イベントカウンター付与」を別画面で開けます。解析・レポート保存では元ソースを変更しません。
+現在は C++ ソースへの Trace マクロ付与ツールを実装しています。WPF のメイン画面から「CPU・イベント統合付与」、個別の「CPU スコープ付与」「イベントカウンター付与」を開けます。統合画面では1回の解析で両方をプレビュー・適用できます。[操作と統合ロジック](wiki/tracing/combined-tracing.md)を参照してください。解析・レポート保存では元ソースを変更しません。
 
 CPU のラベルは「クラス名 関数名」です。対応する `Super::同じ関数名(...)` がある場合はその後から計測し、安全な配置を判断できない構文は理由を表示します。[CPU の名前・計測範囲](wiki/tracing/cpu-scope-policy.md)を参照してください。
 
@@ -37,7 +37,7 @@ UEEtc.sln
 global.json
 src/
   UEEtc.Core/       # 共通の探索・解析・付与・出力ロジック（net10.0）
-    Features/      # FunctionTracing / EventCounters を名前空間ごとに分離
+    Features/      # FunctionTracing / EventCounters / CombinedTracing を名前空間ごとに分離
     Source/        # 共通のソース処理・バックアップ付き適用
     Plans/         # 共通の変更案モデル
     Reporting/     # レポート・差分出力
@@ -72,6 +72,9 @@ Console は引数なしでヘルプを表示します。解析するフォルダ
 ```powershell
 # CPU の解析のみ
 dotnet run --project src/UEEtc.Console -- cpu "D:/Projects/posita/git/Game/BlockBreaker/Source"
+
+# CPU・イベントの統合プレビュー（元ソースは変更しない）
+dotnet run --project src/UEEtc.Console -- combined "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/TraceReports/combined"
 
 # イベント候補の解析と保存（出力先はソース外の空のフォルダー）
 dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/TraceReports/discovery"
@@ -110,6 +113,7 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 ./scripts/Test-CpuScopePolicy.ps1
 ./scripts/Test-CpuScopePolicy.ps1 -CpuMacro str
 ./scripts/Test-ScopedEventCounters.ps1
+./scripts/Test-CombinedTracing.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1

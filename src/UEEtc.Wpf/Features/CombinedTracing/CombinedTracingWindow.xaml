@@ -1,0 +1,104 @@
+<Window x:Class="UEEtc.Wpf.Features.CombinedTracing.CombinedTracingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:UEEtc.Wpf"
+        xmlns:preview="clr-namespace:UEEtc.Wpf.Preview"
+        mc:Ignorable="d"
+        Title="UEEtc - CPU・イベント統合付与" Height="900" Width="1360"
+        MinHeight="720" MinWidth="1100">
+    <Grid Margin="20" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="CPU・イベント統合付与" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Text="1回の解析でCPUとイベントを付与します。ADD・スコープDECREMENTも自動設定し、まとめて確認・適用できます。不要なファイルはチェックを外してください。"
+                       Margin="0,8,0,12" TextWrapping="Wrap" />
+        </StackPanel>
+        <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBox x:Name="SourcePath" Padding="8" VerticalContentAlignment="Center"
+                     ToolTip="Source フォルダーのフルパス。フォルダーをドロップできます。入力は次回も復元します。" TextChanged="InputsChanged" />
+            <Button x:Name="BrowseButton" Grid.Column="1" Content="フォルダーを選択…" Padding="12,6" Margin="8,0,0,0" Click="Browse_Click" />
+        </Grid>
+        <WrapPanel Grid.Row="2" Margin="0,0,0,12">
+            <ComboBox x:Name="CpuMacroOption" SelectedIndex="0" SelectionChanged="InputsChanged" Margin="0,0,12,0" VerticalAlignment="Center" ToolTip="通常形とSTRは同じ静的ID経路です。自動は安全なplain textを通常形、その他を固定文字列リテラルで生成します。">
+                <ComboBoxItem Content="マクロ：自動" /><ComboBoxItem Content="通常形（SCOPE）" /><ComboBoxItem Content="固定文字列（STR）" />
+            </ComboBox>
+            <CheckBox x:Name="AllFunctionsOption" Content="全関数（互換）" IsChecked="False" Click="InputsChanged" VerticalAlignment="Center" Margin="0,0,12,0" ToolTip="通常はループ・データ処理・待機・複数処理を含む関数へ絞ります。実際の負荷は未測定です。" />
+            <Button x:Name="AnalyzeButton" Content="解析・プレビュー" Padding="14,7" Margin="0,0,8,0" Click="Analyze_Click" />
+            <Button x:Name="CancelButton" Content="中止" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Cancel_Click" />
+            <Button x:Name="ExportButton" Content="レポートを保存…" Padding="12,7" IsEnabled="False" Margin="0,0,8,0" Click="Export_Click" />
+            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Padding="12,7" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="解析・プレビューを実行してください。" Click="Apply_Click" />
+        </WrapPanel>
+        <DockPanel Grid.Row="3" Margin="0,0,0,8">
+            <TextBlock Text="検索" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button x:Name="SelectAllButton" Content="全選択" Click="SelectAll_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearAllButton" Content="全解除" Click="ClearAll_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectRowsButton" Content="行を選択" Click="SelectRows_Click" Padding="8,4" Margin="8,0,0,0" ToolTip="強調表示した行を適用対象にします。Ctrl/Shiftで複数行、Spaceで切替。" />
+                <Button x:Name="ClearRowsButton" Content="行を解除" Click="ClearRows_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="SelectVisibleButton" Content="表示中を選択" Click="SelectVisible_Click" Padding="8,4" Margin="8,0,0,0" />
+                <Button x:Name="ClearVisibleButton" Content="表示中を解除" Click="ClearVisible_Click" Padding="8,4" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数名・判定理由を検索。フィルターで隠れた選択も適用対象です。" />
+        </DockPanel>
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="560" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <DataGrid x:Name="FileList" AutoGenerateColumns="False" SelectionMode="Extended" SelectionUnit="FullRow"
+                      SelectionChanged="FileList_SelectionChanged" CanUserAddRows="False" EnableRowVirtualization="True">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="適用" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                        <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSelect}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="28" />
+                    </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" IsReadOnly="True" Width="*" MinWidth="200">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock"><Setter Property="ToolTip" Value="{Binding RelativePath}" /></Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="CPU" Binding="{Binding CpuCount}" IsReadOnly="True" Width="45" />
+                    <DataGridTextColumn Header="イベント" Binding="{Binding EventCount}" IsReadOnly="True" Width="65" />
+                    <DataGridTextColumn Header="DECREMENT" Binding="{Binding DecrementCount}" IsReadOnly="True" Width="105" />
+                    <DataGridTextColumn Header="ADD" Binding="{Binding AddCount}" IsReadOnly="True" Width="50" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" />
+            <TabControl Grid.Column="2">
+                <TabItem Header="付与後プレビュー">
+                    <preview:CodeChangePreview x:Name="PreviewText" />
+                </TabItem>
+                <TabItem Header="付与前">
+                    <TextBox x:Name="OriginalText" IsReadOnly="True" FontFamily="Consolas" FontSize="13"
+                             HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                </TabItem>
+                <TabItem Header="付与内容・判定理由">
+                    <DataGrid x:Name="FunctionList" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="行" Binding="{Binding Line}" Width="50" />
+                            <DataGridTextColumn Header="判定" Binding="{Binding Status}" Width="55" />
+                            <DataGridTextColumn Header="関数" Binding="{Binding Name}" Width="200" />
+                            <DataGridTextColumn Header="CPU" Binding="{Binding CpuDecision}" Width="190" />
+                            <DataGridTextColumn Header="イベント" Binding="{Binding CounterDecision}" Width="230" />
+                            <DataGridTextColumn Header="数量式" Binding="{Binding QuantityValue}" Width="130" />
+                            <DataGridTextColumn Header="理由" Binding="{Binding Reason}" Width="*" MinWidth="160" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+                <TabItem Header="診断">
+                    <TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                </TabItem>
+            </TabControl>
+        </Grid>
+        <StackPanel Grid.Row="5" Margin="0,12,0,0">
+            <ProgressBar x:Name="Progress" Height="4" Visibility="Collapsed" IsIndeterminate="True" />
+            <TextBlock x:Name="StatusText" Text="Source フォルダーを指定して解析してください。" Margin="0,8,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</Window>

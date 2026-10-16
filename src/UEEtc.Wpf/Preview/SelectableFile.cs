@@ -8,6 +8,10 @@ public sealed class SelectableFile(FileAnalysis file, Action changed, bool initi
     public FileAnalysis File { get; } = file;
     public string RelativePath => File.RelativePath;
     public int AddedFunctions => File.AddedFunctions;
+    public int CpuCount => File.AddedCpuScopes;
+    public int EventCount => File.AddedEventCounters;
+    public int DecrementCount => File.AddedDecrements;
+    public int AddCount => File.AddedQuantityCounters;
     public bool CanSelect => File.HasChanges;
     private bool selected = initiallySelected && file.HasChanges;
     public bool Selected { get => selected; set { if (selected == value) return; selected = value; PropertyChanged?.Invoke(this, new(nameof(Selected))); changed(); } }

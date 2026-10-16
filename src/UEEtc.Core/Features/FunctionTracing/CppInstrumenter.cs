@@ -26,7 +26,7 @@ public sealed class CppInstrumenter
             var scanned = CppLexer.Scan(document.Text);
             var tokens = scanned.Where(t => !t.Directive).ToList();
             var matches = MatchBraces(tokens);
-            var edits = new List<(int Position, string Text)>();
+            var edits = new List<SourceInsertion>();
             var counters = new List<string>();
             var pendingCounters = new Dictionary<string, string>(StringComparer.Ordinal);
             bool needsCpuHeader = false;
@@ -50,15 +50,13 @@ public sealed class CppInstrumenter
                         "namespace {" + newline + string.Join(newline, counters) + newline + "}" + newline;
                 int position = anchor!.End;
                 if (position > 0 && document.Text[position - 1] != '\n') declarations = newline + declarations;
-                edits.Add((position, declarations));
+                edits.Add(new(position, declarations));
             }
-            var result = new StringBuilder(document.Text);
-            foreach (var edit in edits.OrderByDescending(e => e.Position)) result.Insert(edit.Position, edit.Text);
-            string proposed = result.ToString();
+            string proposed = SourceInsertion.Apply(document.Text, edits);
             return new(relativePath, functions, diagnostics)
             {
                 OriginalBytes = bytes, ProposedBytes = document.Encode(proposed),
-                OriginalText = document.Text, ProposedText = proposed
+                OriginalText = document.Text, ProposedText = proposed, Insertions = edits
             };
 
             void Visit(int start, int end, string namespaceName)
@@ -155,7 +153,7 @@ public sealed class CppInstrumenter
                     needsCpuHeader = true;
                     string insert = newline + indent + cpuMacro.Macro + "(" + cpuMacro.Argument + ");" + newline;
                     // Insertion stays in the function scope so RAII ends at the function's closing brace.
-                    edits.Add((cpuPlacement.Position!.Value, insert));
+                    edits.Add(new(cpuPlacement.Position!.Value, insert));
                 }
                 if (addCounter)
                 {
@@ -163,7 +161,7 @@ public sealed class CppInstrumenter
                     string declaration = SourceIndentation.Unit(document.Text) + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + " Calls [" + hash + "]") + "\"));";
                     if (!counters.Contains(declaration)) counters.Add(declaration);
                     // Legacy function entry counters keep their entry semantics, including before Super calls.
-                    edits.Add((tokens[open].End, newline + indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline));
+                    edits.Add(new(tokens[open].End, newline + indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline));
                 }
                 functions.Add(new(name, line, "Add", decisions, counter)
                 {
