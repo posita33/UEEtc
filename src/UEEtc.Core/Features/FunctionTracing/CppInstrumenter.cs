@@ -1,8 +1,11 @@
+using UEEtc.Core.Source;
+using UEEtc.Core.Plans;
+
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace UEEtc.Core;
+namespace UEEtc.Core.Features.FunctionTracing;
 
 public sealed class CppInstrumenter
 {

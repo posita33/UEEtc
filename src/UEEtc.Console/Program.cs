@@ -1,4 +1,9 @@
-using UEEtc.Core;
+using UEEtc.Core.Features.FunctionTracing;
+using UEEtc.Core.Plans;
+using UEEtc.Core.Reporting;
+using UEEtc.Core.Features.EventCounters;
+using UEEtc.Core.Source;
+using System.Text.Json;
 
 return Run(args);
 
@@ -7,6 +12,12 @@ static int Run(string[] arguments)
     if (arguments.Length == 0 || arguments is ["--help"] or ["-h"])
     {
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
+        Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("counters: discover braced if/else branches; select none by default. --report exports candidates.json and an empty selection.json.");
+        Console.WriteLine("Copy reviewed Id / CounterName / DisplayName into Selections; --selection validates the source fingerprint before preview/apply.");
+        Console.WriteLine("CPU and event counters are separate features. Counters measure selected branch entries, not inferred successes.");
+        Console.WriteLine("Legacy entry-count commands (retained for existing scripts):");
         Console.WriteLine("Usage: UEEtc.Console <source-full-path> [--cpu-only | --counter-only | --both] [--report <output-full-path>] [--apply]");
         Console.WriteLine("Default: CPU scopes only, preview only. Counters are optional function entry counts, not success/hit counts.");
         Console.WriteLine("--both opts into CPU scopes and entry counters. Existing tracing is preserved independently by kind.");
@@ -19,6 +30,10 @@ static int Run(string[] arguments)
     Console.CancelKeyPress += cancel;
     try
     {
+        if (arguments[0] == "counters") return RunCounters(arguments[1..], cancellation.Token);
+        bool cpuCommand = arguments[0] == "cpu";
+        if (cpuCommand) arguments = arguments[1..];
+        if (arguments.Length == 0) throw new ArgumentException("ソースフォルダーのフルパスを指定してください。");
         string root = arguments[0];
         bool apply = false;
         string? report = null;
@@ -30,9 +45,9 @@ static int Run(string[] arguments)
             {
                 case "--cpu-only" when !modeChosen:
                     options = new(true, false); modeChosen = true; break;
-                case "--counter-only" when !modeChosen:
+                case "--counter-only" when !modeChosen && !cpuCommand:
                     options = new(false, true); modeChosen = true; break;
-                case "--both" when !modeChosen:
+                case "--both" when !modeChosen && !cpuCommand:
                     options = new(true, true); modeChosen = true; break;
                 case "--report" when i + 1 < arguments.Length && report is null:
                     report = arguments[++i]; break;
@@ -43,6 +58,7 @@ static int Run(string[] arguments)
             }
         }
         var service = new InstrumentationService();
+        if (options.CallCounters) Console.Error.WriteLine("Legacy function-entry counts selected. For reviewed event locations use the separate counters command.");
         var plan = service.Analyze(root, options, cancellationToken: cancellation.Token);
         Console.WriteLine(ReportExporter.Summary(plan));
         foreach (var file in plan.Files.Where(f => f.HasChanges))
@@ -65,10 +81,51 @@ static int Run(string[] arguments)
         return plan.DiagnosticCount > 0 ? 1 : 0;
     }
     catch (OperationCanceledException) { Console.Error.WriteLine("Cancelled."); return 130; }
-    catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or InvalidOperationException or AggregateException)
+    catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or InvalidOperationException or AggregateException or JsonException)
     {
         Console.Error.WriteLine(error.Message);
         return 2;
     }
     finally { Console.CancelKeyPress -= cancel; }
+}
+
+static int RunCounters(string[] arguments, CancellationToken cancellation)
+{
+    if (arguments.Length == 0) throw new ArgumentException("ソースフォルダーのフルパスを指定してください。");
+    string root = arguments[0]; string? report = null, selectionPath = null; bool apply = false;
+    for (int i = 1; i < arguments.Length; i++)
+    {
+        switch (arguments[i])
+        {
+            case "--report" when report is null && i + 1 < arguments.Length: report = arguments[++i]; break;
+            case "--selection" when selectionPath is null && i + 1 < arguments.Length: selectionPath = arguments[++i]; break;
+            case "--apply" when !apply: apply = true; break;
+            default: throw new ArgumentException("Unknown or duplicate option: " + arguments[i]);
+        }
+    }
+    if (apply && selectionPath is null) throw new ArgumentException("適用には確認済みの --selection が必要です。");
+    var service = new EventCounterService();
+    var scan = service.Analyze(root, cancellationToken: cancellation);
+    var selection = selectionPath is null ? service.CreateSelection(scan) :
+        JsonSerializer.Deserialize<EventCounterSelectionFile>(File.ReadAllText(selectionPath), EventCounterService.JsonOptions)
+            ?? throw new ArgumentException("選択ファイルが空です。");
+    var plan = service.BuildPlan(scan, selection, cancellation);
+    Console.WriteLine($"イベント候補 {scan.Candidates.Count} / 選択 {selection.Selections.Count}");
+    Console.WriteLine(ReportExporter.Summary(plan));
+    foreach (var diagnostic in plan.Diagnostics.Concat(plan.Files.SelectMany(f => f.Diagnostics.Select(d => f.RelativePath + ": " + d)))) Console.Error.WriteLine(diagnostic);
+    cancellation.ThrowIfCancellationRequested();
+    if (report is not null)
+    {
+        ReportExporter.Export(plan, report);
+        File.WriteAllText(Path.Combine(report, "candidates.json"), JsonSerializer.Serialize(scan.Candidates, EventCounterService.JsonOptions));
+        File.WriteAllText(Path.Combine(report, "selection.json"), JsonSerializer.Serialize(selection, EventCounterService.JsonOptions));
+        Console.WriteLine("Report: " + report);
+    }
+    if (apply)
+    {
+        if (plan.DiagnosticCount > 0) throw new InvalidOperationException("診断のある解析結果は適用できません。");
+        if (plan.ChangedFiles > 0) Console.WriteLine("Applied. Backup: " + new SourceWorkspace().Apply(plan));
+        else Console.WriteLine("No changes to apply.");
+    }
+    return plan.DiagnosticCount > 0 ? 1 : 0;
 }

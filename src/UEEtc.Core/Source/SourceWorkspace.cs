@@ -1,6 +1,8 @@
-namespace UEEtc.Core;
+using UEEtc.Core.Plans;
 
-public sealed class InstrumentationService
+namespace UEEtc.Core.Source;
+
+public sealed class SourceWorkspace
 {
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -8,25 +10,19 @@ public sealed class InstrumentationService
         "Third-Party", "bin", "obj", ".ueetc-backups"
     };
 
-    public AnalysisPlan Analyze(string rootPath, InstrumentationOptions? options = null,
-        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    internal AnalysisPlan Analyze(string rootPath, string feature, Func<string, byte[], FileAnalysis> analyze,
+        Action<string>? reserve = null, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(rootPath) || !Path.IsPathFullyQualified(rootPath))
             throw new ArgumentException("ソースフォルダーのフルパスを指定してください。", nameof(rootPath));
         string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException(root);
         EnsureNoLinks(root);
-        options ??= new();
-        if (!options.CpuScopes && !options.CallCounters)
-            throw new ArgumentException("CPU スコープまたは進入回数カウンターを選択してください。");
         var files = new List<FileAnalysis>();
         var diagnostics = new List<string>();
-        var reservedNames = new HashSet<string>(StringComparer.Ordinal);
-        var instrumenter = new CppInstrumenter();
         Walk(root);
         cancellationToken.ThrowIfCancellationRequested();
-        if (options.CallCounters) progress?.Report("カウンター名の衝突を確認中");
-        return new(root, options, CounterNaming.Resolve(files, reservedNames, cancellationToken), diagnostics);
+        return new(root, feature, files, diagnostics);
 
         void Walk(string directory)
         {
@@ -55,19 +51,16 @@ public sealed class InstrumentationService
                         continue;
                     }
                     string extension = Path.GetExtension(entry).ToLowerInvariant();
-                    if (options.CallCounters && extension is ".h" or ".hpp" or ".inl" or ".cc" or ".cxx")
-                    {
-                        string text = SourceDocument.Read(File.ReadAllBytes(entry)).Text;
-                        reservedNames.UnionWith(CounterNaming.Identifiers(text));
-                    }
+                    if (reserve is not null && (extension is ".h" or ".hpp" or ".inl" or ".cc" or ".cxx"))
+                        reserve?.Invoke(SourceDocument.Read(File.ReadAllBytes(entry)).Text);
                     if (extension != ".cpp" ||
                         entry.EndsWith(".gen.cpp", StringComparison.OrdinalIgnoreCase) ||
                         entry.EndsWith(".generated.cpp", StringComparison.OrdinalIgnoreCase)) continue;
                     string relative = Path.GetRelativePath(root, entry).Replace('\\', '/');
                     progress?.Report(relative);
-                    var analysis = instrumenter.AnalyzeUnresolved(relative, File.ReadAllBytes(entry), options);
+                    var analysis = analyze(relative, File.ReadAllBytes(entry));
                     files.Add(analysis);
-                    if (options.CallCounters) reservedNames.UnionWith(CounterNaming.Identifiers(analysis.OriginalText));
+                    reserve?.Invoke(analysis.OriginalText);
                 }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.DecoderFallbackException)
                 {

@@ -6,6 +6,8 @@ status: todo
 
 # CPU とカウンターの独立した付与条件
 
+このページは Issue #7 時点の記録です。Issue #10 では WPF の進入回数チェックを外し、[イベントカウンターの別画面](event-counters.md)に変更しました。下記の Console オプションは互換用に残しています。
+
 [目次](../README.md) / [調査](macro-pairing.md) / [Issue #7](https://github.com/posita33/UEEtc/issues/7)
 
 ## 調査から決めた動作

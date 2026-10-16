@@ -1,7 +1,10 @@
+using UEEtc.Core.Source;
+using UEEtc.Core.Plans;
+
 using System.Text;
 using System.Text.Json;
 
-namespace UEEtc.Core;
+namespace UEEtc.Core.Reporting;
 
 public static class ReportExporter
 {
@@ -12,7 +15,7 @@ public static class ReportExporter
         string root = Path.TrimEndingDirectorySeparator(plan.RootPath);
         if (IsWithin(output, root) || IsWithin(root, output))
             throw new IOException("出力先は解析対象フォルダーの外側（親・子以外）を指定してください。");
-        InstrumentationService.EnsureNoLinks(output);
+        SourceWorkspace.EnsureNoLinks(output);
         if (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any())
             throw new IOException("出力先には空のフォルダーを指定してください。");
         Directory.CreateDirectory(output);
@@ -23,7 +26,7 @@ public static class ReportExporter
         File.WriteAllText(Path.Combine(output, "changes.patch"), CreatePatch(plan), new UTF8Encoding(false));
         foreach (var file in plan.Files.Where(f => f.HasChanges))
         {
-            string destination = InstrumentationService.Resolve(Path.Combine(output, "modified"), file.RelativePath);
+            string destination = SourceWorkspace.Resolve(Path.Combine(output, "modified"), file.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.WriteAllBytes(destination, file.ProposedBytes);
         }
@@ -63,7 +66,7 @@ public static class ReportExporter
     }
 
     public static string Summary(AnalysisPlan plan) =>
-        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 関数付与（CPU {plan.AddedCpuScopes} / 進入回数 {plan.AddedCallCounters}） / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断";
+        $"{plan.Files.Count} ファイル解析 / {plan.ChangedFiles} ファイル変更候補 / {plan.AddedFunctions} 箇所付与（CPU {plan.AddedCpuScopes} / 進入回数 {plan.AddedCallCounters} / イベント {plan.AddedEventCounters}） / {plan.SkippedFunctions} 関数スキップ / {plan.DiagnosticCount} 件の診断";
 
     private static string[] Lines(string text) => text.Length == 0 ? [] :
         (text.EndsWith('\n') ? text[..^1] : text).Split('\n');
