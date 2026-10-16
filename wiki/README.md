@@ -10,6 +10,7 @@ Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録
 
 現行の全体像と次の機能候補:
 
+- [チェック済みファイルの適用判定・無効理由の表示（Issue #49）](tracing/apply-selection-availability.md)
 - [Engineとの整合性監査・goto対策・責務分離（Issue #47）](tracing/engine-audit-and-refactoring.md)
 - [CPU・イベントを1回の解析で付与する統合画面（Issue #45）](tracing/combined-tracing.md)
 - [CPU・イベントの付与ロジックとEngine参照箇所（Issue #43）](tracing/current-feature-logic.md)

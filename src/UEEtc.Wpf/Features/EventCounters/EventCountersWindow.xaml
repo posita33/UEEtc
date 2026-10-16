@@ -113,6 +113,7 @@
         <StackPanel Grid.Row="5" Margin="0,12,0,0">
             <ProgressBar x:Name="Progress" Height="4" IsIndeterminate="True" Visibility="Collapsed" />
             <TextBlock x:Name="StatusText" Text="ソースフォルダーを指定して解析してください。" Margin="0,8,0,0" TextWrapping="Wrap" />
+            <TextBlock x:Name="ApplyStatusText" Text="{Binding ToolTip, ElementName=ApplyButton}" Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
     </Grid>
 </Window>
