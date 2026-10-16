@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace UEEtc.Core;
+namespace UEEtc.Core.Source;
 
 internal sealed record SourceDocument(byte[] Bytes, string Text, Encoding Encoding, int PreambleLength)
 {

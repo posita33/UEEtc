@@ -1,5 +1,7 @@
 using System.Text;
-using UEEtc.Core;
+using UEEtc.Core.Features.FunctionTracing;
+using UEEtc.Core.Plans;
+using UEEtc.Core.Reporting;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -373,11 +375,12 @@ var tests = new (string Name, Action Run)[]
     ("Newline-free tail is represented in the review patch", () =>
     {
         var file = Analyze("void Work() { Run(); }");
-        var plan = new AnalysisPlan("unused", new(), [file], []);
+        var plan = new AnalysisPlan("unused", "FunctionTracing", [file], []);
         Contains(ReportExporter.CreatePatch(plan), "\\ No newline at end of file");
     })
 };
 
+tests = tests.Concat(EventCounterTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {

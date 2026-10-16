@@ -1,0 +1,59 @@
+<Window x:Class="UEEtc.Wpf.Features.EventCounters.EventCountersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UEEtc - イベントカウンター" Width="1280" Height="900" MinWidth="1000" MinHeight="720">
+    <Grid Margin="20" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+            <RowDefinition Height="2*" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="イベントカウンター付与" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Text="条件分岐への到達回数を計測します。候補のヒントは名前からの推測です。数える意味を確認して選択し、名前を編集してください。" TextWrapping="Wrap" Margin="0,8,0,6" />
+            <TextBlock Text="現在個数・処理中件数は減算や SET の設計が必要です。この画面では累積回数だけを追加します。初期選択は 0 件です。" TextWrapping="Wrap" Margin="0,0,0,12" />
+        </StackPanel>
+        <DockPanel Grid.Row="1" Margin="0,0,0,10">
+            <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="フォルダーを選択…" Click="Browse_Click" Padding="12,6" Margin="8,0,0,0" />
+            <TextBox x:Name="SourcePath" TextChanged="SourceChanged" Padding="8" ToolTip="Source フォルダーのフルパス" />
+        </DockPanel>
+        <DockPanel Grid.Row="2" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <Button x:Name="AnalyzeButton" Content="候補を解析" Click="Analyze_Click" Padding="14,7" Margin="0,0,8,0" />
+                <Button x:Name="CancelButton" Content="中止" Click="Cancel_Click" IsEnabled="False" Padding="12,7" Margin="0,0,12,0" />
+                <TextBlock Text="絞り込み" VerticalAlignment="Center" Margin="0,0,8,0" />
+            </StackPanel>
+            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数・条件・ヒントを検索" />
+        </DockPanel>
+        <DataGrid Grid.Row="3" x:Name="CandidateList" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single"
+                  SelectionChanged="CandidateSelected" EnableRowVirtualization="True" IsEnabled="False">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="選択" Width="48">
+                    <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                        <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </DataTemplate></DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="ファイル" Binding="{Binding Candidate.RelativePath}" IsReadOnly="True" Width="180" />
+                <DataGridTextColumn Header="行" Binding="{Binding Candidate.Line}" IsReadOnly="True" Width="45" />
+                <DataGridTextColumn Header="ヒント（要確認）" Binding="{Binding Candidate.Hint}" IsReadOnly="True" Width="130" />
+                <DataGridTextColumn Header="分岐" Binding="{Binding Candidate.Branch}" IsReadOnly="True" Width="50" />
+                <DataGridTextColumn Header="条件" Binding="{Binding Candidate.Condition}" IsReadOnly="True" Width="200" />
+                <DataGridTextColumn Header="カウンター名" Binding="{Binding CounterName, UpdateSourceTrigger=PropertyChanged}" Width="240" />
+                <DataGridTextColumn Header="Insights 表示名" Binding="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Width="280" />
+            </DataGrid.Columns>
+        </DataGrid>
+        <WrapPanel Grid.Row="4" Margin="0,12,0,12">
+            <Button x:Name="PreviewButton" Content="選択した箇所をプレビュー" Click="Preview_Click" IsEnabled="False" Padding="14,7" Margin="0,0,8,0" />
+            <Button x:Name="ExportButton" Content="レポートを保存…" Click="Export_Click" IsEnabled="False" Padding="12,7" Margin="0,0,8,0" />
+            <Button x:Name="ApplyButton" Content="元ファイルへ適用…" Click="Apply_Click" IsEnabled="False" Padding="12,7" />
+        </WrapPanel>
+        <TabControl Grid.Row="5">
+            <TabItem Header="候補の位置・数える内容"><TextBox x:Name="ContextText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
+            <TabItem Header="付与後プレビュー"><TextBox x:Name="PreviewText" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
+            <TabItem Header="診断"><TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" /></TabItem>
+        </TabControl>
+        <StackPanel Grid.Row="6" Margin="0,12,0,0">
+            <ProgressBar x:Name="Progress" Height="4" IsIndeterminate="True" Visibility="Collapsed" />
+            <TextBlock x:Name="StatusText" Text="ソースフォルダーを指定して候補を解析してください。" Margin="0,8,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</Window>

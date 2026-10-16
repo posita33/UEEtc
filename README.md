@@ -9,9 +9,9 @@ UEいろいろコード
 
 Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジトリです。
 
-現在は C++ ソースへの Trace マクロ付与ツールを実装しています。フォルダーのフルパスから `.cpp` を再帰解析し、CPU スコープと関数進入回数カウンターの付与案をプレビューできます。解析・レポート保存では元ソースを変更しません。
+現在は C++ ソースへの Trace マクロ付与ツールを実装しています。WPF のメイン画面から「CPU スコープ付与」と「イベントカウンター付与」を別画面で開けます。解析・レポート保存では元ソースを変更しません。
 
-標準は CPU の時間計測のみです。関数進入回数も必要なら WPF で選択するか、Console に `--both` を付けます。カウンターだけなら `--counter-only` を使用できます。既存の CPU 計測とカウンターは種類ごとに判定し、重複する種類を維持します。[調査に基づく付与方針](wiki/tracing/independent-trace-policy.md)も参照してください。
+CPU は関数全体の時間を計測します。イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択した場所にだけ追加します。候補はすべて初期選択オフです。[Engine の用途調査・現行の使い方と構成](wiki/tracing/event-counters.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
@@ -31,6 +31,10 @@ UEEtc.sln
 global.json
 src/
   UEEtc.Core/       # 共通の探索・解析・付与・出力ロジック（net10.0）
+    Features/      # FunctionTracing / EventCounters を名前空間ごとに分離
+    Source/        # 共通のソース処理・バックアップ付き適用
+    Plans/         # 共通の変更案モデル
+    Reporting/     # レポート・差分出力
   UEEtc.Console/    # Console アプリ（net10.0）
   UEEtc.Wpf/        # WPF アプリ（net10.0-windows）
 tests/             # Core 回帰テスト、WPF スモークテスト
@@ -60,11 +64,14 @@ dotnet run --project src/UEEtc.Wpf
 Console は引数なしでヘルプを表示します。解析するフォルダーを指定する例:
 
 ```powershell
-# 読み取りと解析だけを実行
-dotnet run --project src/UEEtc.Console -- "D:/Projects/posita/git/Game/BlockBreaker/Source"
+# CPU の解析のみ
+dotnet run --project src/UEEtc.Console -- cpu "D:/Projects/posita/git/Game/BlockBreaker/Source"
+
+# イベント候補の解析と保存（出力先はソース外の空のフォルダー）
+dotnet run --project src/UEEtc.Console -- counters "D:/Projects/posita/git/Game/BlockBreaker/Source" --report "D:/TraceReports/discovery"
 ```
 
-WPF ではフォルダーを入力・選択して「解析・プレビュー」を押してください。付与後／付与前のソース、関数の判定理由、診断を確認できます。
+WPF ではメイン画面から機能を選び、ソースフォルダーを指定します。イベント画面は「候補を解析」→対象にチェック・名前を編集→「選択した箇所をプレビュー」の順に使います。条件式と前後のソース、付与後のソース、診断を確認できます。
 
 両方ともレポート・差分・加工済みコピーの保存に対応します。実際に元ファイルを変更する操作は、WPF の「元ファイルへ適用」または Console の `--apply` です。適用時にはバックアップを作成します。[詳細な使い方と制限](wiki/tracing/implementation.md)を参照してください。
 
@@ -85,7 +92,10 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 
 # MSVC x64 の C++ ツールが必要
 ./scripts/Test-CppInstrumentation.ps1
+./scripts/Test-EventCounters.ps1
 
 # Lyra / BlockBreaker を読み取り、加工済みコピーだけを artifacts/ に出力
 ./scripts/Invoke-TraceExperiments.ps1
+./scripts/Invoke-EventCounterExperiments.ps1
+./scripts/Invoke-ReviewedEventCounterExamples.ps1
 ```

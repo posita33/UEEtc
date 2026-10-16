@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace UEEtc.Core;
+namespace UEEtc.Core.Source;
 
 internal sealed record CppToken(string Text, int Start, int End, bool Literal = false, bool Directive = false);
 
