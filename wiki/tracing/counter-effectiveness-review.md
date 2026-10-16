@@ -38,7 +38,7 @@ status: todo
 | --- | --- |
 | `Source/Runtime/CoreUObject/Private/Serialization/BulkDataStreaming.cpp:623,631` の `BulkDataBatchRequest_Count` | コンストラクターで増え、デストラクターで減る。名前に Count があっても、生存中の要求を数える形 |
 | `Source/Runtime/AudioMixer/Private/AudioMixerSourceManager.cpp:1036,4220,4343` の `AudioMixerSourceManager_TotalQdCmds` | Total を含む名前でも減算がある。名前だけでは累積と判定できない |
-| `Source/Runtime/StorageServerClient/Private/Cache/CacheJournalSimple.cpp:37,73-74,84,89-90` | 起動時の復元、無効化時の SET、削除時の減算がある。一方 Invalidated は無効化要求の回数で、実際に見つかって削除できた数とは異なる |
+| `Source/Runtime/StorageServerClient/Private/Cache/CacheJournalSimple.cpp:37,75-76,84,89-90` | 起動時の復元、無効化時の SET、削除時の減算がある。一方 Invalidated は無効化要求の回数で、実際に見つかって削除できた数とは異なる |
 | `Source/Runtime/Engine/Private/ShaderCompiler/ShaderCompilerJobCache.cpp:1759,1771,1793` | 検索試行、メモリヒット、DDC 要求は別の段階・母数。GetHit だけを増やしても原因やヒット率を判断できない |
 | `Source/Runtime/Experimental/IoStore/OnDemand/Private/OnDemandContentInstaller.cpp:1309,1313,1328` | 取消・HTTP エラー・検証成功を分け、成功は内容のハッシュ検証後。呼び出し開始や HTTP 2xx だけを成功にしない |
 | `Source/Runtime/Engine/Private/Streaming/SimpleStreamableAssetManager.cpp:564` | 二重登録の自己修復経路。正常時と異なる処理に進んだ回数を数え、異常頻度の観察に結び付く |
