@@ -36,17 +36,23 @@
             <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数・条件・ヒントを検索。隠れた選択も適用対象です。" />
         </DockPanel>
         <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="400" MinWidth="280" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" MinWidth="400" /></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="510" MinWidth="420" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" MinWidth="400" /></Grid.ColumnDefinitions>
             <DataGrid x:Name="FileList" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Extended" SelectionUnit="FullRow"
                       SelectionChanged="FileSelected" EnableRowVirtualization="True" IsEnabled="False">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="適用" Width="45"><DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSelect}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="28" />
                     </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-                    <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" IsReadOnly="True" Width="*" MinWidth="230">
+                    <DataGridTextColumn Header="ファイル" Binding="{Binding RelativePath}" IsReadOnly="True" Width="*" MinWidth="200">
                         <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="ToolTip" Value="{Binding RelativePath}" /></Style></DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
                     <DataGridTextColumn Header="候補" Binding="{Binding CandidateCount}" IsReadOnly="True" Width="55" />
+                    <DataGridTextColumn Binding="{Binding DecrementCount}" IsReadOnly="True" Width="105">
+                        <DataGridTextColumn.Header><TextBlock Text="DECREMENT" ToolTip="含める候補へのDECREMENT付与予定数。適用ファイルのチェック状態には依存しません。" /></DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Binding="{Binding AddCount}" IsReadOnly="True" Width="55">
+                        <DataGridTextColumn.Header><TextBlock Text="ADD" ToolTip="含める候補へのADD付与予定数。詳細設定が未完了の候補も含みます。" /></DataGridTextColumn.Header>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" />
