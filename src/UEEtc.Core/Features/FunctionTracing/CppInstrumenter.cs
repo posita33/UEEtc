@@ -118,9 +118,10 @@ public sealed class CppInstrumenter
                 bool existingCpu = HasCall(t => t.StartsWith("TRACE_CPUPROFILER", StringComparison.Ordinal) ||
                     t.Contains("SCOPE_CYCLE_COUNTER", StringComparison.Ordinal) || t.StartsWith("SCOPED_NAMED_EVENT", StringComparison.Ordinal));
                 bool existingCounter = HasCall(t => t.StartsWith("TRACE_COUNTER_", StringComparison.Ordinal));
-                bool addCpu = options.CpuScopes && !existingCpu;
+                var cpuPlacement = CpuScopePlacement.Find(name, tokens, scanned, open, close);
+                bool addCpu = options.CpuScopes && !existingCpu && cpuPlacement.Position is not null;
                 bool addCounter = options.CallCounters && !existingCounter;
-                string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" : "追加：関数全体の時間";
+                string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" : cpuPlacement.Decision;
                 string counterDecision = !options.CallCounters ? "未選択" : existingCounter ? "既存のカウンター操作を維持（意味は自動推定しない）" : "追加：関数進入回数（成功・命中数ではない）";
                 string decisions = "CPU: " + cpuDecision + " / Counter: " + counterDecision;
                 if (!addCpu && !addCounter)
@@ -132,6 +133,9 @@ public sealed class CppInstrumenter
                 string identity = relativePath.Replace('\\', '/') + "|" + signature;
                 string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))[..16];
                 string label = "UEEtc/" + relativePath.Replace('\\', '/') + "/" + namespaceName + name + " [" + hash + "]";
+                // CPU labels are intentionally short; source paths and function metadata remain in the report.
+                string cpuLabel = name.Contains("::", StringComparison.Ordinal)
+                    ? string.Join(" ", name.Split("::").TakeLast(2)) : name;
                 // Resolve names together across the selected source tree after candidate discovery.
                 string? counter = null;
                 if (addCounter && !pendingCounters.TryGetValue(identity, out counter))
@@ -141,21 +145,23 @@ public sealed class CppInstrumenter
                     pendingCounters.Add(identity, counter);
                 }
                 string indent = Indent(document.Text, tokens[open].Start) + "\t";
-                string insert = newline + indent + "// UEEtc: function entry" + newline;
                 if (addCpu)
                 {
                     needsCpuHeader = true;
-                    insert += indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(label) + "\");" + newline;
+                    string insert = newline + indent + "// UEEtc: CPU scope" + newline +
+                        indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(cpuLabel) + "\");" + newline;
+                    // Insertion stays in the function scope so RAII ends at the function's closing brace.
+                    edits.Add((cpuPlacement.Position!.Value, insert));
                 }
                 if (addCounter)
                 {
                     needsCounterHeader = true;
                     string declaration = "\tTRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + "/Calls") + "\"));";
                     if (!counters.Contains(declaration)) counters.Add(declaration);
-                    insert += indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline;
+                    // Legacy function entry counters keep their entry semantics, including before Super calls.
+                    edits.Add((tokens[open].End, newline + indent + "// UEEtc: function entry counter" + newline +
+                        indent + "TRACE_COUNTER_INCREMENT(" + counter + ");" + newline));
                 }
-                // Existing bytes after the brace are left intact, including one-line functions.
-                edits.Add((tokens[open].End, insert));
                 functions.Add(new(name, line, "Add", decisions, counter)
                 {
                     CpuScopeAdded = addCpu, CallCounterAdded = addCounter,
