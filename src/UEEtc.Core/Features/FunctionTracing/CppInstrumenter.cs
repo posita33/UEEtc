@@ -147,7 +147,7 @@ public sealed class CppInstrumenter
                     while (document.Text.Contains(counter, StringComparison.Ordinal)) counter += "_";
                     pendingCounters.Add(identity, counter);
                 }
-                string indent = Indent(document.Text, tokens[open].Start) + "\t";
+                string indent = SourceIndentation.Block(document.Text, tokens, open, close);
                 if (addCpu)
                 {
                     needsCpuHeader = true;
@@ -159,7 +159,7 @@ public sealed class CppInstrumenter
                 if (addCounter)
                 {
                     needsCounterHeader = true;
-                    string declaration = "\tTRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + "/Calls") + "\"));";
+                    string declaration = SourceIndentation.Unit(document.Text) + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + counter + ", TEXT(\"" + Escape(label + "/Calls") + "\"));";
                     if (!counters.Contains(declaration)) counters.Add(declaration);
                     // Legacy function entry counters keep their entry semantics, including before Super calls.
                     edits.Add((tokens[open].End, newline + indent + "// UEEtc: function entry counter" + newline +
@@ -220,11 +220,4 @@ public sealed class CppInstrumenter
         Regex.IsMatch(t.Text, "[\"<]ProfilingDebugging/" + Regex.Escape(file) + "[\">]"));
     private static bool Identifier(string value) => Regex.IsMatch(value, @"^[A-Za-z_]\w*$");
     private static string Escape(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-    private static string Indent(string text, int position)
-    {
-        int start = text.LastIndexOf('\n', Math.Max(0, position - 1)) + 1;
-        int end = start;
-        while (end < text.Length && text[end] is ' ' or '\t') end++;
-        return text[start..end];
-    }
 }

@@ -11,6 +11,7 @@ using UEEtc.Wpf;
 using UEEtc.Wpf.Features.CpuTracing;
 using UEEtc.Wpf.Features.EventCounters;
 using UEEtc.Wpf.InputAssistance;
+using UEEtc.Wpf.Preview;
 
 internal static class Program
 {
@@ -36,17 +37,20 @@ internal static class Program
             var cpuPath = (TextBox)cpu.FindName("SourcePath"); var cpuAnalyze = FindButton(cpu, "AnalyzeButton");
             cpuPath.Text = root; cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert(!cpuPath.IsEnabled, "CPU locks inputs"); Wait(cpuAnalyze);
-            var cpuFile = (FileAnalysis)((DataGrid)cpu.FindName("FileList")).SelectedItem;
+            var cpuFile = ((SelectableFile)((DataGrid)cpu.FindName("FileList")).SelectedItem).File;
             Assert(cpuFile.AddedCpuScopes == 0, "Focused CPU skips this tiny branch wrapper by default");
             var allFunctions = (CheckBox)cpu.FindName("AllFunctionsOption");
             allFunctions.IsChecked = true; allFunctions.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
             cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(cpuAnalyze);
-            cpuFile = (FileAnalysis)((DataGrid)cpu.FindName("FileList")).SelectedItem;
+            var cpuRow = (SelectableFile)((DataGrid)cpu.FindName("FileList")).SelectedItem;
+            cpuFile = cpuRow.File;
             Assert(cpuFile.AddedCpuScopes == 1 && cpuFile.AddedCallCounters == 0, "CPU adds scopes only");
             Assert(!cpuFile.ProposedText.Contains("TRACE_COUNTER_INCREMENT"), "CPU never inserts event counts");
             Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"F Work\")"), "CPU label is class and function");
             Assert(cpuFile.ProposedText.IndexOf("Super::Work();", StringComparison.Ordinal) < cpuFile.ProposedText.IndexOf("TRACE_CPUPROFILER", StringComparison.Ordinal), "CPU starts after Super");
-            Assert(FindButton(cpu, "ApplyButton").IsEnabled, "CPU valid preview can be applied");
+            Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "CPU starts with zero apply selection");
+            cpuRow.Selected = true;
+            Assert(FindButton(cpu, "ApplyButton").IsEnabled, "Selected CPU file can be applied");
             cpuPath.Text += "-changed";
             Assert(!FindButton(cpu, "ApplyButton").IsEnabled && !FindButton(cpu, "ExportButton").IsEnabled, "CPU path invalidates preview");
             FindButton(home, "EventFeatureButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -63,7 +67,7 @@ internal static class Program
             Assert(((TextBox)events.FindName("ContextText")).Text.Contains("bCacheHit"), "Candidate context includes condition");
             rows[0].Selected = true; rows[0].CounterName = "VerifiedCacheHitCount"; rows[0].DisplayName = "Cache/VerifiedHits";
             var previewButton = FindButton(events, "PreviewButton"); previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
-            string preview = ((TextBox)events.FindName("PreviewText")).Text;
+            string preview = ((CodeChangePreview)events.FindName("PreviewText")).Text;
             Assert(preview.Contains("TRACE_COUNTER_INCREMENT(VerifiedCacheHitCount)"), "Selected name reaches preview");
             Assert(preview.Split("TRACE_COUNTER_INCREMENT").Length == 2, "Only selected branch added");
             Assert(!preview.Contains("CpuProfilerTrace.h"), "Events do not add CPU tracing");
@@ -74,7 +78,7 @@ internal static class Program
             Assert(((ComboBox)events.FindName("QuantityValueInput")).Text == "4", "Quantity value binding reflects edited model");
             Assert(!FindButton(events, "ApplyButton").IsEnabled, "Quantity edit invalidates plan");
             previewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(previewButton);
-            Assert(((TextBox)events.FindName("PreviewText")).Text.Contains("TRACE_COUNTER_ADD(TransferredItems, 4)"), "Quantity reaches generated preview");
+            Assert(((CodeChangePreview)events.FindName("PreviewText")).Text.Contains("TRACE_COUNTER_ADD(TransferredItems, 4)"), "Quantity reaches generated preview");
             ((TextBox)events.FindName("FilterText")).Text = "does-not-match";
             Assert(list.Items.Count == 0 && rows[0].Selected, "Filtering does not change selection");
             ((TextBox)events.FindName("FilterText")).Text = "";
@@ -111,6 +115,7 @@ internal static class Program
             Assert(list.ItemsSource is null && !previewButton.IsEnabled, "Source edit clears event candidates");
             Assert(File.ReadAllText(Path.Combine(root, "Fixture.cpp")) == source, "All previews preserve original source");
             InputAssistanceTests.Run(root, Assert);
+            WorkflowTests.Run(root, Assert, args.FirstOrDefault());
             Console.WriteLine($"WPF smoke: {checks} checks passed (launcher, separate windows, selection, naming, filtering, invalidation, source unchanged).");
             return 0;
         }
@@ -134,7 +139,7 @@ internal static class Program
         }
         Assert(action.IsEnabled, "Operation completed within timeout");
     }
-    private static void Screenshot(Window window, string path, int width, int height)
+    internal static void Screenshot(Window window, string path, int width, int height)
     {
         var content = (FrameworkElement)window.Content; content.Measure(new Size(width, height)); content.Arrange(new Rect(0, 0, width, height)); content.UpdateLayout();
         var image = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); image.Render(content);

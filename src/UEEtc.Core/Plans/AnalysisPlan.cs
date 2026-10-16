@@ -35,6 +35,7 @@ public sealed record FileAnalysis(string RelativePath, IReadOnlyList<FunctionAna
 public sealed record AnalysisPlan(string RootPath, string Feature,
     IReadOnlyList<FileAnalysis> Files, IReadOnlyList<string> Diagnostics)
 {
+    public bool RequiresQuantityConfirmation { get; init; }
     public int ChangedFiles => Files.Count(f => f.HasChanges);
     public int AddedFunctions => Files.Sum(f => f.AddedFunctions);
     public int AddedCpuScopes => Files.Sum(f => f.AddedCpuScopes);

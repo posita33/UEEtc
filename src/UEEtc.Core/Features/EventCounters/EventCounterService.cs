@@ -11,6 +11,7 @@ public sealed record EventCounterCandidate(string Id, string RelativePath, strin
     string Branch, string Condition, string Hint, string Reason, string SuggestedName, string DisplayName)
 {
     public IReadOnlyList<string> AddValues { get; init; } = [];
+    public QuantityRecommendation? RecommendedQuantity { get; init; }
     internal int Position { get; init; }
     internal string Indent { get; init; } = "";
 }
@@ -166,12 +167,12 @@ public sealed class EventCounterService
                                 Regex.IsMatch(condition, "fail|error|success|result|cancel|valid|null|blocked|missing", RegexOptions.IgnoreCase) ? "結果・ガード候補" :
                                 Regex.IsMatch(condition, "retry|recover|stale", RegexOptions.IgnoreCase) ? "再試行・復旧候補" :
                                 Regex.IsMatch(condition, "clear|remain|health|lives|spawn|dead|destroy", RegexOptions.IgnoreCase) ? "状態遷移候補" : "条件分岐";
-                            int lineStart = document.Text.LastIndexOf('\n', Math.Max(0, tokens[open].Start - 1)) + 1;
-                            string indent = new(document.Text[lineStart..tokens[open].Start].TakeWhile(c => c is ' ' or '\t').ToArray());
+                            var addValues = QuantityCounterValues.Find(function, tokens, tokens[open].End);
                             candidates.Add(new(id, relativePath, function.Name, line, branch, condition, hint,
                                 (branch == "If" ? "条件が真の分岐" : "対応条件が偽の分岐") + "への到達を数える。成功・失敗の意味は要確認。",
                                 name, "UEEtc/Events/" + relativePath + "/" + function.Name + "/" + branch + number)
-                            { Position = tokens[open].End, Indent = indent + "\t", AddValues = QuantityCounterValues.Find(function, tokens, tokens[open].End) });
+                            { Position = tokens[open].End, Indent = SourceIndentation.Block(document.Text, tokens, open, close), AddValues = addValues,
+                                RecommendedQuantity = QuantityRecommendation.Find(addValues) });
                         }
                     }
                 }
@@ -186,6 +187,14 @@ public sealed class EventCounterService
 
     public AnalysisPlan BuildPlan(EventCounterScan scan, IEnumerable<EventCounterSelection> selections,
         CancellationToken cancellationToken = default)
+        => Build(scan, selections, false, cancellationToken);
+
+    public AnalysisPlan BuildPreview(EventCounterScan scan, IEnumerable<EventCounterSelection> selections,
+        CancellationToken cancellationToken = default)
+        => Build(scan, selections, true, cancellationToken);
+
+    private AnalysisPlan Build(EventCounterScan scan, IEnumerable<EventCounterSelection> selections,
+        bool allowUnconfirmed, CancellationToken cancellationToken)
     {
         var requested = selections.ToArray();
         if (requested.Any(s => s is null || string.IsNullOrWhiteSpace(s.Id) || string.IsNullOrWhiteSpace(s.CounterName) || string.IsNullOrWhiteSpace(s.DisplayName)))
@@ -207,7 +216,7 @@ public sealed class EventCounterService
             Allocate(s.Id, s.CounterName, s.DisplayName);
             if (s.Quantity is { } q)
             {
-                if (!q.MeaningConfirmed || string.IsNullOrWhiteSpace(q.Unit) || q.Unit.Any(char.IsControl))
+                if ((!allowUnconfirmed && !q.MeaningConfirmed) || string.IsNullOrWhiteSpace(q.Unit) || q.Unit.Any(char.IsControl))
                     throw new ArgumentException("ADD の数量・単位・この位置で数える意味を確認してください。");
                 if (string.IsNullOrWhiteSpace(q.Value) || !QuantityCounterValues.IsAllowed(q.Value, available[s.Id]))
                     throw new ArgumentException("ADD 値は候補の AddValues または 0～4294967295 の十進整数だけを指定できます。関数呼び出し・任意式・未確認の変数は使用できません。");
@@ -239,17 +248,18 @@ public sealed class EventCounterService
             var edits = new List<(int Position, string Text)>();
             var rows = new List<FunctionAnalysis>();
             var declarations = new List<string>();
+            string unit = SourceIndentation.Unit(doc.Text);
             foreach (var s in selected)
             {
                 var c = available[s.Id]; string name = assigned[s.Id];
                 string insert = newline + c.Indent + "// UEEtc: event " + c.Id + newline + c.Indent + "TRACE_COUNTER_INCREMENT(" + name + ");" + newline;
                 string display = duplicateDisplays.Contains(s.DisplayName) ? s.DisplayName + " [" + s.Id + "]" : s.DisplayName;
-                declarations.Add("\tTRACE_DECLARE_ATOMIC_INT_COUNTER(" + name + ", TEXT(\"" + Escape(display) + "\"));");
+                declarations.Add(unit + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + name + ", TEXT(\"" + Escape(display) + "\"));");
                 if (s.Quantity is { } q)
                 {
                     string quantityName = assigned[s.Id + "_Quantity"];
                     string quantityDisplay = q.DisplayName + (duplicateDisplays.Contains(q.DisplayName) ? " [" + c.Id + " Quantity]" : "") + " [" + q.Unit + "]";
-                    declarations.Add("\tTRACE_DECLARE_ATOMIC_INT_COUNTER(" + quantityName + ", TEXT(\"" + Escape(quantityDisplay) + "\"));");
+                    declarations.Add(unit + "TRACE_DECLARE_ATOMIC_INT_COUNTER(" + quantityName + ", TEXT(\"" + Escape(quantityDisplay) + "\"));");
                     insert += c.Indent + "TRACE_COUNTER_ADD(" + quantityName + ", " + q.Value + ");" + newline;
                 }
                 edits.Add((c.Position, insert));
@@ -264,7 +274,7 @@ public sealed class EventCounterService
             string text = output.ToString();
             return file with { Functions = rows, ProposedText = text, ProposedBytes = doc.Encode(text) };
         }).ToArray();
-        return scan.Snapshot with { Files = files };
+        return scan.Snapshot with { Files = files, RequiresQuantityConfirmation = requested.Any(s => s.Quantity is { MeaningConfirmed: false }) };
     }
 
     public EventCounterSelectionFile CreateSelection(EventCounterScan scan) => new(scan.Snapshot.RootPath, Fingerprint(scan), []);

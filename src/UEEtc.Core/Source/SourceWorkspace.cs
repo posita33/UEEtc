@@ -73,6 +73,7 @@ public sealed class SourceWorkspace
     // Called only by an explicit UI / CLI apply action. The experiment uses Analyze / Export only.
     public string Apply(AnalysisPlan plan)
     {
+        if (plan.RequiresQuantityConfirmation) throw new InvalidOperationException("数量 ADD の意味・単位が未確認です。確認してプレビューを更新してください。");
         if (plan.DiagnosticCount > 0) throw new InvalidOperationException("診断のある解析結果は適用できません。");
         var changes = plan.Files.Where(f => f.HasChanges).ToArray();
         if (changes.Length == 0) throw new InvalidOperationException("適用する変更がありません。");
