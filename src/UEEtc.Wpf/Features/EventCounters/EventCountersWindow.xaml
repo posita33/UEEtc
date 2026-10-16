@@ -14,7 +14,7 @@
         </StackPanel>
         <DockPanel Grid.Row="1" Margin="0,0,0,10">
             <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="フォルダーを選択…" Click="Browse_Click" Padding="12,6" Margin="8,0,0,0" />
-            <TextBox x:Name="SourcePath" TextChanged="SourceChanged" Padding="8" ToolTip="Source フォルダーのフルパス" />
+            <TextBox x:Name="SourcePath" TextChanged="SourceChanged" Padding="8" ToolTip="Source フォルダーのフルパス。フォルダーをドロップできます。入力は次回も復元します。" />
         </DockPanel>
         <DockPanel Grid.Row="2" Margin="0,0,0,10">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
@@ -22,7 +22,7 @@
                 <Button x:Name="CancelButton" Content="中止" Click="Cancel_Click" IsEnabled="False" Padding="12,7" Margin="0,0,12,0" />
                 <TextBlock Text="絞り込み" VerticalAlignment="Center" Margin="0,0,8,0" />
             </StackPanel>
-            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数・条件・ヒントを検索" />
+            <TextBox x:Name="FilterText" TextChanged="FilterChanged" Padding="6" ToolTip="パス・関数・条件・ヒントを検索。絞り込み文字も次回復元します。" />
         </DockPanel>
         <DataGrid Grid.Row="3" x:Name="CandidateList" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single"
                   SelectionChanged="CandidateSelected" EnableRowVirtualization="True" IsEnabled="False">

@@ -7,20 +7,24 @@ using UEEtc.Core.Features.EventCounters;
 using UEEtc.Core.Plans;
 using UEEtc.Core.Reporting;
 using UEEtc.Core.Source;
+using UEEtc.Wpf.InputAssistance;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace UEEtc.Wpf.Features.EventCounters;
 
-public sealed class CandidateRow(EventCounterCandidate candidate, Action changed) : INotifyPropertyChanged
+public sealed class CandidateRow(EventCounterCandidate candidate, Action changed, Action<CandidateRow>? edited = null,
+    string? savedName = null, string? savedDisplay = null) : INotifyPropertyChanged
 {
     public EventCounterCandidate Candidate { get; } = candidate;
     private bool selected;
-    private string counterName = candidate.SuggestedName;
-    private string displayName = candidate.DisplayName;
+    private string counterName = savedName ?? candidate.SuggestedName;
+    private string displayName = savedDisplay ?? candidate.DisplayName;
     public bool Selected { get => selected; set { selected = value; Changed(nameof(Selected)); } }
     public string CounterName { get => counterName; set { counterName = value; Changed(nameof(CounterName)); } }
     public string DisplayName { get => displayName; set { displayName = value; Changed(nameof(DisplayName)); } }
     public event PropertyChangedEventHandler? PropertyChanged;
-    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); }
+    private void Changed(string name) { PropertyChanged?.Invoke(this, new(name)); changed(); if (name != nameof(Selected)) edited?.Invoke(this); }
     public EventCounterSelection Selection() => new(Candidate.Id, CounterName, DisplayName);
 }
 
@@ -33,7 +37,17 @@ public partial class EventCountersWindow : Window
     private CancellationTokenSource? cancellation;
     private bool busy;
     public bool IsBusy => busy;
-    public EventCountersWindow() => InitializeComponent();
+    private readonly RememberedInputs inputs;
+    public EventCountersWindow() : this(InputSettingsStore.Default) { }
+    public EventCountersWindow(InputSettingsStore settings)
+    {
+        InitializeComponent();
+        inputs = new(this, settings, text => StatusText.Text = text);
+        inputs.Bind(SourcePath, "EventCounters.SourcePath");
+        inputs.Bind(FilterText, "EventCounters.Filter");
+        FolderDropInput.Attach(SourcePath, text => StatusText.Text = text);
+        inputs.ReportLoadError();
+    }
 
     private void InvalidatePlan()
     {
@@ -67,7 +81,10 @@ public partial class EventCountersWindow : Window
         {
             var progress = new Progress<string>(path => StatusText.Text = "候補解析中: " + path);
             scan = await Task.Run(() => service.Analyze(root, progress, cts.Token));
-            rows = scan.Candidates.OrderBy(c => c.Hint == "条件分岐").Select(c => new CandidateRow(c, InvalidatePlan)).ToList();
+            string scope = "EventCounters.Edits." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(scan.Snapshot.RootPath.ToUpperInvariant()))) + ".";
+            rows = scan.Candidates.OrderBy(c => c.Hint == "条件分岐").Select(c => new CandidateRow(c, InvalidatePlan,
+                row => { inputs.Set(scope + c.Id + ".Name", row.CounterName); inputs.Set(scope + c.Id + ".Display", row.DisplayName); },
+                inputs.Get(scope + c.Id + ".Name"), inputs.Get(scope + c.Id + ".Display"))).ToList();
             CandidateList.ItemsSource = rows;
             FilterChanged(this, new TextChangedEventArgs(TextBox.TextChangedEvent, UndoAction.None));
             DiagnosticsText.Text = string.Join(Environment.NewLine, scan.Snapshot.Diagnostics.Concat(scan.Snapshot.Files.SelectMany(f => f.Diagnostics.Select(d => f.RelativePath + ": " + d))));
