@@ -71,6 +71,7 @@ class FUnity_A { public: static void Work(); };
 # They are not substitutes for a build using Unreal's actual toolchain and headers.
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'ProfilingDebugging/CpuProfilerTrace.h'), @'
 #pragma once
+#define TRACE_CPUPROFILER_EVENT_SCOPE(Name) TRACE_CPUPROFILER_EVENT_SCOPE_STR(#Name)
 #if TEST_CPU_ENABLED
 struct TestScope { TestScope() { ++ScopeEntries; } ~TestScope() { ++ScopeExits; } };
 #define TRACE_CPUPROFILER_EVENT_SCOPE_STR(Name) TestScope TestScopeInstance;

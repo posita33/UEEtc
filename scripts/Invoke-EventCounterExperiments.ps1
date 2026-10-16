@@ -1,7 +1,8 @@
 param(
     [string]$LyraSource = 'D:/Projects/posita/UE/R_A_D/LyraStarterGame/Source',
     [string]$BlockBreakerSource = 'D:/Projects/posita/git/Game/BlockBreaker/Source',
-    [switch]$RecommendedAdd
+    [switch]$RecommendedAdd,
+    [ValidateSet('Cumulative','ActiveScope')][string]$Measurement = 'Cumulative'
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -22,7 +23,7 @@ foreach ($target in @(@{Name='lyra';Root=$LyraSource}, @{Name='blockbreaker';Roo
     $candidates = @(Get-Content (Join-Path $discovery 'candidates.json') -Raw -Encoding utf8 | ConvertFrom-Json)
     $selection = Get-Content (Join-Path $discovery 'selection.json') -Raw -Encoding utf8 | ConvertFrom-Json
     # Stress-test all recognized sites on generated copies only. This is not a recommended gameplay selection.
-    $selection.Selections = @($candidates | ForEach-Object { [pscustomobject]@{ Id=$_.Id; CounterName=$_.SuggestedName; DisplayName=$_.DisplayName } })
+    $selection.Selections = @($candidates | ForEach-Object { [pscustomobject]@{ Id=$_.Id; CounterName=$_.SuggestedName; DisplayName=$_.DisplayName + $(if ($Measurement -eq 'ActiveScope') {' ActiveScopes'} else {''}); Measurement=$Measurement } })
     $selectionPath = Join-Path $runRoot ($target.Name + '-test-selection.json')
     $selection | ConvertTo-Json -Depth 6 | Set-Content $selectionPath -Encoding utf8
     $output = Join-Path $runRoot ($target.Name + '-selected')
@@ -43,6 +44,7 @@ foreach ($target in @(@{Name='lyra';Root=$LyraSource}, @{Name='blockbreaker';Roo
         ChangedFiles=$plan.ChangedFiles; Diagnostics=$plan.DiagnosticCount
         QuantityRecommendations=@($candidates | Where-Object { $null -ne $_.RecommendedQuantity }).Count
         AddedQuantityCounters=$plan.AddedQuantityCounters
+        Measurement=$Measurement; AddedDecrements=$plan.AddedDecrements
         SecondPassCandidates=$secondCandidates.Count; OriginalFiles=$before.Count; OriginalChanges=0
     }
     $summary | ConvertTo-Json | Set-Content (Join-Path $runRoot ($target.Name + '-summary.json')) -Encoding utf8

@@ -46,11 +46,15 @@ internal static class Program
             cpuFile = cpuRow.File;
             Assert(cpuFile.AddedCpuScopes == 1 && cpuFile.AddedCallCounters == 0, "CPU adds scopes only");
             Assert(!cpuFile.ProposedText.Contains("TRACE_COUNTER_INCREMENT"), "CPU never inserts event counts");
-            Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"F Work\")"), "CPU label is class and function");
+            Assert(cpuFile.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE(F Work)"), "Auto CPU label is class and function as plain text");
             Assert(cpuFile.ProposedText.IndexOf("Super::Work();", StringComparison.Ordinal) < cpuFile.ProposedText.IndexOf("TRACE_CPUPROFILER", StringComparison.Ordinal), "CPU starts after Super");
             Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "CPU starts with zero apply selection");
             cpuRow.Selected = true;
             Assert(FindButton(cpu, "ApplyButton").IsEnabled, "Selected CPU file can be applied");
+            ((ComboBox)cpu.FindName("CpuMacroOption")).SelectedIndex = 2;
+            Assert(!FindButton(cpu, "ApplyButton").IsEnabled, "CPU macro choice invalidates plan");
+            cpuAnalyze.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Wait(cpuAnalyze);
+            Assert(((CodeChangePreview)cpu.FindName("PreviewText")).Text.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"F Work\")"), "Explicit STR preserves the same fixed label");
             cpuPath.Text += "-changed";
             Assert(!FindButton(cpu, "ApplyButton").IsEnabled && !FindButton(cpu, "ExportButton").IsEnabled, "CPU path invalidates preview");
             FindButton(home, "EventFeatureButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

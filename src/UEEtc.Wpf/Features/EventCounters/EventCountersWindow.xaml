@@ -70,6 +70,8 @@
                         </DataGrid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="QuantityEditor" Margin="10" DataContext="{Binding SelectedItem, ElementName=CandidateList}" IsEnabled="False">
+                            <CheckBox Content="この分岐のスコープ現在数（退出時に DECREMENT）" IsChecked="{Binding TrackActiveScopes}" Margin="0,0,0,8" />
+                            <TextBlock Text="標準は累積進入回数です。現在数はこの分岐の入口から退出までを数え、returnでも減少します。非同期要求やオブジェクトの生存数とは異なります。" TextWrapping="Wrap" Margin="0,0,0,10" />
                             <TextBlock Text="回数カウンターの識別子" /><TextBox Text="{Binding CounterName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8" />
                             <TextBlock Text="Insights 表示名" /><TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,12" />
                             <Separator />

@@ -140,6 +140,7 @@ public sealed class CppInstrumenter
                 // CPU labels are intentionally short; source paths and function metadata remain in the report.
                 string cpuLabel = name.Contains("::", StringComparison.Ordinal)
                     ? string.Join(" ", name.Split("::").TakeLast(2)) : name;
+                var cpuMacro = CpuScopeMacro.Select(cpuLabel, options.CpuMacro);
                 // Resolve names together across the selected source tree after candidate discovery.
                 string? counter = null;
                 if (addCounter && !pendingCounters.TryGetValue(identity, out counter))
@@ -152,7 +153,7 @@ public sealed class CppInstrumenter
                 if (addCpu)
                 {
                     needsCpuHeader = true;
-                    string insert = newline + indent + "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"" + Escape(cpuLabel) + "\");" + newline;
+                    string insert = newline + indent + cpuMacro.Macro + "(" + cpuMacro.Argument + ");" + newline;
                     // Insertion stays in the function scope so RAII ends at the function's closing brace.
                     edits.Add((cpuPlacement.Position!.Value, insert));
                 }
@@ -167,7 +168,8 @@ public sealed class CppInstrumenter
                 functions.Add(new(name, line, "Add", decisions, counter)
                 {
                     CpuScopeAdded = addCpu, CallCounterAdded = addCounter,
-                    CpuDecision = cpuDecision, CounterDecision = counterDecision,
+                    CpuDecision = cpuDecision + (addCpu ? " / " + cpuMacro.Macro + ": " + cpuMacro.Reason : ""), CounterDecision = counterDecision,
+                    CpuMacro = addCpu ? cpuMacro.Macro : null, CpuScopeLabel = addCpu ? cpuLabel : null,
                     CounterBaseName = CounterNaming.BaseName(namespaceName, name),
                     CounterIdentity = identity, CounterHash = hash
                 });

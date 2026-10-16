@@ -1,4 +1,4 @@
-param()
+param([ValidateSet('auto','scope','str')][string]$CpuMacro = 'auto')
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/cpu-policy-cpp/' + [guid]::NewGuid().ToString('N'))
@@ -53,6 +53,7 @@ int main() {
 '@, $utf8)
 [System.IO.File]::WriteAllText((Join-Path $stubDir 'ProfilingDebugging/CpuProfilerTrace.h'), @'
 #pragma once
+#define TRACE_CPUPROFILER_EVENT_SCOPE(Name) TRACE_CPUPROFILER_EVENT_SCOPE_STR(#Name)
 #if TEST_CPU_ENABLED
 struct TestScope {
     explicit TestScope(const char* label) { if (std::strcmp(label, "Derived Work") != 0) ++Errors; ++ActiveScopes; ++ScopeEntries; }
@@ -76,15 +77,17 @@ struct Counter { std::atomic<int> Value{0}; explicit Counter(const wchar_t*) {} 
 '@, $utf8)
 $cli = Join-Path $repoRoot 'src/UEEtc.Console/bin/Release/net10.0/UEEtc.Console.dll'
 $output = Join-Path $runRoot 'preview'
-dotnet $cli $sourceDir --both --report $output
+dotnet $cli $sourceDir --both --cpu-macro $CpuMacro --report $output
 if ($LASTEXITCODE -ne 0) { throw 'Preview failed.' }
 git -C $sourceDir apply --check (Join-Path $output 'changes.patch')
 if ($LASTEXITCODE -ne 0) { throw 'Patch check failed.' }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vsPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (!$vsPath) { throw 'MSVC x64 tools not found.' }
-Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
-Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+if ($env:VSCMD_ARG_TGT_ARCH -ne 'x64' -or !(Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+    Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+    Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+}
 foreach ($cpu in @(0,1)) {
     foreach ($counter in @(0,1)) {
         $tag = "cpu$cpu-counter$counter"
