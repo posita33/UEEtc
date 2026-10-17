@@ -141,7 +141,7 @@ internal static class Program
             Assert(list.ItemsSource is null && !previewButton.IsEnabled, "Source edit clears event candidates");
             Assert(File.ReadAllText(Path.Combine(root, "Fixture.cpp")) == source, "All previews preserve original source");
             InputAssistanceTests.Run(root, Assert);
-            ApplyAvailabilityTests.Run(root, Assert);
+            ApplyAvailabilityTests.Run(root, Assert, args.FirstOrDefault());
             WorkflowTests.Run(root, Assert, args.FirstOrDefault());
             CombinedWorkflowTests.Run(home, root, Assert, args.FirstOrDefault());
             Console.WriteLine($"WPF smoke: {checks} checks passed (launcher, separate windows, selection, naming, filtering, invalidation, source unchanged).");

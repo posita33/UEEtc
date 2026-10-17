@@ -10,10 +10,11 @@ using UEEtc.Wpf.Features.CombinedTracing;
 using UEEtc.Wpf.Features.CpuTracing;
 using UEEtc.Wpf.Features.EventCounters;
 using UEEtc.Wpf.InputAssistance;
+using UEEtc.Wpf.Workflow;
 
 internal static class ApplyAvailabilityTests
 {
-    public static void Run(string root, Action<bool, string> check)
+    public static void Run(string root, Action<bool, string> check, string? screenshots)
     {
         foreach (string feature in new[] { "CPU", "Events", "Combined" })
         {
@@ -24,12 +25,8 @@ internal static class ApplyAvailabilityTests
             byte[] unsupported = [0xff, 0xfe, 0, 0, 65, 0, 0, 0];
             File.WriteAllBytes(Path.Combine(source, "Unsupported.cpp"), unsupported);
             var settings = new InputSettingsStore(Path.Combine(source, "settings.json"));
-            Window window = feature switch
-            {
-                "CPU" => new CpuTracingWindow(settings),
-                "Events" => new EventCountersWindow(settings),
-                _ => new CombinedTracingWindow(settings)
-            };
+            Window window = Create(settings);
+            string customBackup = Path.Combine(root, "Backups", feature);
             try
             {
                 window.Show();
@@ -42,6 +39,20 @@ internal static class ApplyAvailabilityTests
                 var hint = (TextBlock)window.FindName("ApplyStatusText");
                 hint.GetBindingExpression(TextBlock.TextProperty)!.UpdateTarget();
                 check(hint.Text.Contains("適用可能") && hint.Text.Contains("対象外ファイル"), feature + " always displays applicable state and excluded diagnostics");
+                var backupLocation = (BackupLocationPicker)window.FindName("BackupLocation");
+                var backupInput = (TextBox)backupLocation.FindName("PathInput");
+                check(backupLocation.BackupRoot == BackupStorage.DefaultRoot, feature + " default backup folder is outside source");
+                string proposal = Selected()!.Files.Single().ProposedText;
+                foreach (string invalid in new[] { source, Path.Combine(source, "Backup"), "", "relative" })
+                {
+                    backupInput.Text = invalid;
+                    check(!((Button)window.FindName("ApplyButton")).IsEnabled && ((Button)window.FindName("ExportButton")).IsEnabled, feature + " invalid backup path blocks apply while allowing export");
+                }
+                backupInput.Text = customBackup;
+                check(((Button)window.FindName("ApplyButton")).IsEnabled && Selected()!.Files.Single().ProposedText == proposal, feature + " changing backup path retains preview and enables apply without reanalysis");
+                hint.GetBindingExpression(TextBlock.TextProperty)!.UpdateTarget();
+                check(hint.Text.Contains(customBackup), feature + " apply status shows configured backup location");
+                if (screenshots is not null) Program.Screenshot(window, Path.Combine(screenshots, "backup-location-" + feature + ".png"), 1360, 900);
                 var list = (DataGrid)window.FindName("FileList");
                 var item = list.Items.Cast<object>().Single(row => (string)row.GetType().GetProperty("RelativePath")!.GetValue(row)! == "Good.cpp");
                 list.ScrollIntoView(item); window.UpdateLayout();
@@ -50,7 +61,8 @@ internal static class ApplyAvailabilityTests
                 check(Selected()?.ChangedFiles == 0 && !((Button)window.FindName("ApplyButton")).IsEnabled, feature + " actual checkbox uncheck disables apply");
                 checkbox.IsChecked = true; Until(() => !Busy());
                 check(Selected()?.ChangedFiles == 1 && ((Button)window.FindName("ApplyButton")).IsEnabled, feature + " actual checkbox recheck enables apply");
-                string backup = new SourceWorkspace().Apply(Selected()!);
+                string backup = new SourceWorkspace().Apply(Selected()!, backupLocation.BackupRoot);
+                check(Path.GetDirectoryName(backup) == customBackup && !Directory.Exists(Path.Combine(source, ".ueetc-backups")), feature + " uses configured external backup folder only");
                 check(Directory.GetFiles(backup, "*.cpp", SearchOption.AllDirectories).Length == 1, feature + " backs up only selected good file");
                 check(File.ReadAllText(Path.Combine(source, "Good.cpp")).Contains("TRACE_"), feature + " applies valid selected file");
                 check(File.ReadAllBytes(Path.Combine(source, "Unsupported.cpp")).SequenceEqual(unsupported), feature + " preserves excluded unsupported bytes");
@@ -67,7 +79,11 @@ internal static class ApplyAvailabilityTests
                 check(rejected && File.ReadAllText(Path.Combine(source, "Good.cpp")) == good, feature + " backend also rejects workspace diagnostics without writes");
             }
             finally { window.Close(); }
+            var restarted = Create(new InputSettingsStore(settings.Path));
+            try { check(((BackupLocationPicker)restarted.FindName("BackupLocation")).BackupRoot == customBackup, feature + " backup location survives reopening with settings reloaded from disk"); }
+            finally { restarted.Close(); }
 
+            Window Create(InputSettingsStore store) => feature switch { "CPU" => new CpuTracingWindow(store), "Events" => new EventCountersWindow(store), _ => new CombinedTracingWindow(store) };
             bool Busy() => window switch { CpuTracingWindow w => w.IsBusy, EventCountersWindow w => w.IsPreviewPending, CombinedTracingWindow w => w.IsBusy, _ => false };
             AnalysisPlan? Selected() => window switch { CpuTracingWindow w => w.SelectedPlan, EventCountersWindow w => w.SelectedPlan, CombinedTracingWindow w => w.SelectedPlan, _ => null };
         }

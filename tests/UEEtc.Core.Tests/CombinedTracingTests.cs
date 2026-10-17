@@ -63,7 +63,7 @@ internal static class CombinedTracingTests
         {
             File.WriteAllText(Path.Combine(root, "B.cpp"), Batch);
             var plan = new CombinedTracingService().Analyze(root); var selected = plan with { Files = plan.Files.Where(f => f.RelativePath == "A.cpp").ToArray() };
-            string backup = new SourceWorkspace().Apply(selected);
+            string backup = new SourceWorkspace().Apply(selected, Path.Combine(Path.GetDirectoryName(root)!, "Backups"));
             Check(File.ReadAllText(Path.Combine(backup, "A.cpp")) == Batch && Directory.GetFiles(backup, "*.cpp", SearchOption.AllDirectories).Length == 1);
             Check(File.ReadAllText(Path.Combine(root, "A.cpp")).Contains("TRACE_CPUPROFILER") && File.ReadAllText(Path.Combine(root, "A.cpp")).Contains("TRACE_COUNTER_ADD"));
             Check(File.ReadAllText(Path.Combine(root, "B.cpp")) == Batch);
@@ -88,9 +88,10 @@ internal static class CombinedTracingTests
     }
     private static void WithSource(string source, Action<string> action)
     {
-        string root = Path.Combine(Path.GetTempPath(), "UEEtc-combined-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        string container = Path.Combine(Path.GetTempPath(), "UEEtc-combined-" + Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(container, "Source"); Directory.CreateDirectory(root);
         try { File.WriteAllText(Path.Combine(root, "A.cpp"), source); action(root); }
-        finally { Directory.Delete(root, true); }
+        finally { Directory.Delete(container, true); }
     }
     private static void Check(bool value) { if (!value) throw new Exception("Combined tracing assertion failed"); }
 }

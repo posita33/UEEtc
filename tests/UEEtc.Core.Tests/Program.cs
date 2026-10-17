@@ -114,7 +114,7 @@ var tests = new (string Name, Action Run)[]
         Assert(counters.All(c => c!.StartsWith("A_B_Work_CallCount_", StringComparison.Ordinal)));
         Equal(string.Join(",", counters), string.Join(",", second.Files.SelectMany(f => f.Functions).Select(f => f.Counter)));
         Assert(first.Files.All(f => !f.ProposedText.Contains("UEEtcPendingCounter_")));
-        service.Apply(first);
+        service.Apply(first, Path.Combine(Path.GetDirectoryName(root)!, "Backups"));
         Equal(0, service.Analyze(root).ChangedFiles);
     })),
     ("Existing names and macro-expanded variable names in headers are reserved", () => WithTemporaryRoot(root =>
@@ -314,7 +314,7 @@ var tests = new (string Name, Action Run)[]
         Write(root, "Module/Work.cpp", Fixture());
         var service = new InstrumentationService();
         var plan = service.Analyze(root);
-        string backup = service.Apply(plan);
+        string backup = service.Apply(plan, Path.Combine(Path.GetDirectoryName(root)!, "Backups"));
         Assert(File.ReadAllBytes(Path.Combine(backup, "Module/Work.cpp")).AsSpan().SequenceEqual(plan.Files[0].OriginalBytes));
         Assert(File.ReadAllBytes(Path.Combine(root, "Module/Work.cpp")).AsSpan().SequenceEqual(plan.Files[0].ProposedBytes));
         Equal(0, service.Analyze(root).ChangedFiles);
@@ -389,6 +389,7 @@ tests = tests.Concat(TraceLifetimeTests.All).ToArray();
 tests = tests.Concat(AutomaticCounterTests.All).ToArray();
 tests = tests.Concat(CombinedTracingTests.All).ToArray();
 tests = tests.Concat(EngineAuditTests.All).ToArray();
+tests = tests.Concat(BackupStorageTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {
@@ -418,14 +419,15 @@ static void Write(string root, string relative, string text)
 }
 static void WithTemporaryRoot(Action<string> action)
 {
-    string root = Path.Combine(Path.GetTempPath(), "UEEtc-tests", Guid.NewGuid().ToString("N"));
+    string container = Path.Combine(Path.GetTempPath(), "UEEtc-tests", Guid.NewGuid().ToString("N"));
+    string root = Path.Combine(container, "Source");
     Directory.CreateDirectory(root);
     try { action(root); }
     finally
     {
         // Only delete the exact temporary root created by this test.
         string expectedParent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "UEEtc-tests")) + Path.DirectorySeparatorChar;
-        if (!Path.GetFullPath(root).StartsWith(expectedParent, StringComparison.OrdinalIgnoreCase)) throw new Exception("Invalid temporary path");
-        Directory.Delete(root, recursive: true);
+        if (!Path.GetFullPath(container).StartsWith(expectedParent, StringComparison.OrdinalIgnoreCase)) throw new Exception("Invalid temporary path");
+        Directory.Delete(container, recursive: true);
     }
 }

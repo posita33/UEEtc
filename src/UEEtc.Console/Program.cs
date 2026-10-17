@@ -32,6 +32,7 @@ static int Run(string[] arguments)
         Console.WriteLine("--both opts into CPU scopes and entry counters. Existing tracing is preserved independently by kind.");
         Console.WriteLine("--report exports JSON, a review patch and modified copies.");
         Console.WriteLine("--apply writes source files after validating the preview and creating backups.");
+        Console.WriteLine("--backup-dir <full-path> sets a backup folder outside the source tree for every command. Default: " + BackupStorage.DefaultRoot);
         return 0;
     }
     using var cancellation = new CancellationTokenSource();
@@ -45,7 +46,7 @@ static int Run(string[] arguments)
         if (arguments.Length == 0) throw new ArgumentException("ソースフォルダーのフルパスを指定してください。");
         string root = arguments[0];
         bool apply = false;
-        string? report = null;
+        string? report = null, backupRoot = null;
         InstrumentationOptions options = new(FocusedCpu: cpuCommand || combinedCommand);
         bool modeChosen = false;
         bool macroChosen = false;
@@ -68,6 +69,8 @@ static int Run(string[] arguments)
                     report = arguments[++i]; break;
                 case "--apply" when !apply:
                     apply = true; break;
+                case "--backup-dir" when backupRoot is null && i + 1 < arguments.Length:
+                    backupRoot = arguments[++i]; break;
                 default:
                     throw new ArgumentException($"Unknown or duplicate option: {arguments[i]}");
             }
@@ -91,7 +94,7 @@ static int Run(string[] arguments)
         {
             if (plan.DiagnosticCount > 0)
                 throw new InvalidOperationException("診断のある解析結果は適用できません。レポートを確認してください。");
-            if (plan.ChangedFiles > 0) Console.WriteLine($"Applied. Backup: {service.Apply(plan)}");
+            if (plan.ChangedFiles > 0) Console.WriteLine($"Applied. Backup: {service.Apply(plan, backupRoot)}");
             else Console.WriteLine("No changes to apply.");
         }
         return plan.DiagnosticCount > 0 ? 1 : 0;
@@ -108,7 +111,7 @@ static int Run(string[] arguments)
 static int RunCounters(string[] arguments, CancellationToken cancellation)
 {
     if (arguments.Length == 0) throw new ArgumentException("ソースフォルダーのフルパスを指定してください。");
-    string root = arguments[0]; string? report = null, selectionPath = null; bool apply = false, recommendedAdd = false, recommendedCounters = false;
+    string root = arguments[0]; string? report = null, selectionPath = null, backupRoot = null; bool apply = false, recommendedAdd = false, recommendedCounters = false;
     for (int i = 1; i < arguments.Length; i++)
     {
         switch (arguments[i])
@@ -116,6 +119,7 @@ static int RunCounters(string[] arguments, CancellationToken cancellation)
             case "--report" when report is null && i + 1 < arguments.Length: report = arguments[++i]; break;
             case "--selection" when selectionPath is null && i + 1 < arguments.Length: selectionPath = arguments[++i]; break;
             case "--apply" when !apply: apply = true; break;
+            case "--backup-dir" when backupRoot is null && i + 1 < arguments.Length: backupRoot = arguments[++i]; break;
             case "--recommended-add" when !recommendedAdd: recommendedAdd = true; break;
             case "--recommended-counters" when !recommendedCounters: recommendedCounters = true; break;
             default: throw new ArgumentException("Unknown or duplicate option: " + arguments[i]);
@@ -154,7 +158,7 @@ static int RunCounters(string[] arguments, CancellationToken cancellation)
     if (apply)
     {
         if (plan.DiagnosticCount > 0) throw new InvalidOperationException("診断のある解析結果は適用できません。");
-        if (plan.ChangedFiles > 0) Console.WriteLine("Applied. Backup: " + new SourceWorkspace().Apply(plan));
+        if (plan.ChangedFiles > 0) Console.WriteLine("Applied. Backup: " + new SourceWorkspace().Apply(plan, backupRoot));
         else Console.WriteLine("No changes to apply.");
     }
     return plan.DiagnosticCount > 0 ? 1 : 0;

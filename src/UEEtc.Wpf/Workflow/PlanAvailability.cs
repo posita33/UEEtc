@@ -1,9 +1,22 @@
 using UEEtc.Core.Plans;
+using UEEtc.Core.Source;
 
 namespace UEEtc.Wpf.Workflow;
 
 internal sealed record PlanAvailability(bool CanExport, bool CanApply, string ApplyHint)
 {
+    public PlanAvailability WithBackupRoot(AnalysisPlan? selected, string backupRoot)
+    {
+        if (!CanApply || selected is null) return this;
+        try
+        {
+            string location = BackupStorage.ResolveRoot(selected.RootPath, backupRoot);
+            return this with { ApplyHint = ApplyHint + " バックアップ先: " + location };
+        }
+        catch (Exception error) when (error is ArgumentException or System.IO.IOException or UnauthorizedAccessException)
+        { return this with { CanApply = false, ApplyHint = "適用不可: " + error.Message }; }
+    }
+
     public static PlanAvailability For(AnalysisPlan? plan, AnalysisPlan? selected, bool busy)
     {
         if (busy) return new(false, false, "処理の完了を待ってください。");
