@@ -177,7 +177,7 @@ internal static class EventCounterTests
         {
             var service = new EventCounterService(); var scan = service.Analyze(root);
             var plan = service.BuildPlan(scan, scan.Candidates.Select(Select));
-            string backup = new SourceWorkspace().Apply(plan);
+            string backup = new SourceWorkspace().Apply(plan, Path.Combine(Path.GetDirectoryName(root)!, "Backups"));
             Check(File.ReadAllBytes(Path.Combine(backup, "Fixture.cpp")).SequenceEqual(plan.Files.Single().OriginalBytes));
             Throws<IOException>(() => new SourceWorkspace().Apply(plan));
         }),
@@ -185,7 +185,7 @@ internal static class EventCounterTests
         {
             var service = new EventCounterService(); var scan = service.Analyze(root);
             var plan = service.BuildPlan(scan, scan.Candidates.Select(Select));
-            new SourceWorkspace().Apply(plan);
+            new SourceWorkspace().Apply(plan, Path.Combine(Path.GetDirectoryName(root)!, "Backups"));
             var cpu = new InstrumentationService().Analyze(root);
             Check(cpu.AddedCpuScopes == 1 && cpu.AddedEventCounters == 0 && cpu.AddedCallCounters == 0);
             Check(cpu.Files.Single().ProposedText.Contains("TRACE_COUNTER_INCREMENT"));
@@ -208,9 +208,10 @@ internal static class EventCounterTests
     private static (string, Action) Test(string name, Action<string> action) => ("Events: " + name, () =>
     {
         string parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "UEEtc-event-tests")) + Path.DirectorySeparatorChar;
-        string root = Path.Combine(parent, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        string container = Path.Combine(parent, Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(container, "Source"); Directory.CreateDirectory(root);
         try { Write(root, "void Work() { if (bCacheHit) { Act(); } else { Fail(); } }"); action(root); }
-        finally { if (!Path.GetFullPath(root).StartsWith(parent, StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid temporary path"); Directory.Delete(root, true); }
+        finally { if (!Path.GetFullPath(container).StartsWith(parent, StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid temporary path"); Directory.Delete(container, true); }
     });
     private static EventCounterSelection Select(EventCounterCandidate c) => new(c.Id, c.SuggestedName, c.DisplayName);
     private static void Write(string root, string body) => File.WriteAllText(Path.Combine(root, "Fixture.cpp"), "#include \"Fixture.h\"\n" + body, new UTF8Encoding(false));

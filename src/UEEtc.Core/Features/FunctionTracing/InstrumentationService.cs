@@ -22,5 +22,5 @@ public sealed class InstrumentationService
         return plan with { Files = CounterNaming.Resolve(plan.Files, reserved, cancellationToken) };
     }
 
-    public string Apply(AnalysisPlan plan) => new SourceWorkspace().Apply(plan);
+    public string Apply(AnalysisPlan plan, string? backupRoot = null) => new SourceWorkspace().Apply(plan, backupRoot);
 }

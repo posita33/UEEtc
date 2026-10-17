@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UEEtc.Wpf"
         xmlns:preview="clr-namespace:UEEtc.Wpf.Preview"
+        xmlns:workflow="clr-namespace:UEEtc.Wpf.Workflow"
         mc:Ignorable="d"
         Title="UEEtc - CPU・イベント統合付与" Height="900" Width="1360"
         MinHeight="720" MinWidth="1100">
@@ -23,10 +24,12 @@
                        Margin="0,8,0,12" TextWrapping="Wrap" />
         </StackPanel>
         <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <TextBox x:Name="SourcePath" Padding="8" VerticalContentAlignment="Center"
                      ToolTip="Source フォルダーのフルパス。フォルダーをドロップできます。入力は次回も復元します。" />
             <Button x:Name="BrowseButton" Grid.Column="1" Content="フォルダーを選択…" Padding="12,6" Margin="8,0,0,0" />
+            <workflow:BackupLocationPicker x:Name="BackupLocation" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" />
         </Grid>
         <WrapPanel Grid.Row="2" Margin="0,0,0,12">
             <ComboBox x:Name="CpuMacroOption" SelectedIndex="0" Margin="0,0,12,0" VerticalAlignment="Center" ToolTip="通常形とSTRは同じ静的ID経路です。自動は安全なplain textを通常形、その他を固定文字列リテラルで生成します。">

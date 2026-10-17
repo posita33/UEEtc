@@ -56,7 +56,7 @@ internal static class WorkflowTests
             cpu.UpdateLayout(); preview.MoveChange(1); preview.MoveChange(1); Pump();
             check(((RichTextBox)preview.FindName("Editor")).VerticalOffset > 0, "Change navigation scrolls the actual document");
             preview.ShowComparison(files[0].File.OriginalText, files[0].File.ProposedText);
-            var selected = cpu.SelectedPlan!; string backup = new SourceWorkspace().Apply(selected);
+            var selected = cpu.SelectedPlan!; string backup = new SourceWorkspace().Apply(selected, Path.Combine(root, "Backups"));
             check(File.ReadAllText(Path.Combine(source, "Beta.cpp")) == b, "Apply leaves unselected file byte content unchanged");
             check(File.ReadAllText(Path.Combine(source, "Alpha.cpp")).Contains("TRACE_CPUPROFILER"), "Apply changes selected file");
             check(Directory.GetFiles(backup, "*.cpp", SearchOption.AllDirectories).Length == 1, "Backup contains selected file only");
@@ -101,7 +101,7 @@ internal static class WorkflowTests
             Click(events, "ClearAllButton"); Until(() => !events.IsPreviewPending); check(!eventFile.Selected, "Global event clear");
             eventFile.Selected = true; Until(() => !events.IsPreviewPending);
             string alphaBefore = File.ReadAllText(Path.Combine(source, "Alpha.cpp"));
-            string eventBackup = new SourceWorkspace().Apply(events.SelectedPlan!);
+            string eventBackup = new SourceWorkspace().Apply(events.SelectedPlan!, Path.Combine(root, "Backups"));
             check(File.ReadAllText(Path.Combine(source, "Alpha.cpp")) == alphaBefore && File.ReadAllText(Path.Combine(source, "Beta.cpp")).Contains("TRACE_COUNTER_INCREMENT"), "Event apply modifies only the checked file");
             check(Directory.GetFiles(eventBackup, "*.cpp", SearchOption.AllDirectories).Length == 1, "Event backup contains one selected file");
 

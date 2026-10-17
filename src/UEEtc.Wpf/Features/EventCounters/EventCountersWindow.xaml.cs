@@ -41,6 +41,8 @@ public partial class EventCountersWindow : Window
         SelectionActions.Attach(FileList);
         previewTimer.Tick += (_, _) => { previewTimer.Stop(); if (!busy && scan is not null) Preview_Click(this, new RoutedEventArgs()); };
         inputs = new(this, settings, text => StatusText.Text = text);
+        BackupLocation.Initialize(inputs, "EventCounters");
+        BackupLocation.Changed += (_, _) => SetBusy(busy);
         inputs.Bind(SourcePath, "EventCounters.SourcePath");
         inputs.Bind(FilterText, "EventCounters.Filter");
         FolderDropInput.Attach(SourcePath, text => StatusText.Text = text);
@@ -172,7 +174,7 @@ public partial class EventCountersWindow : Window
     }
     private async void Export_Click(object sender, RoutedEventArgs e) => await fileActions.ExportAsync(SelectedPlan);
     private async void Apply_Click(object sender, RoutedEventArgs e) =>
-        await fileActions.ApplyAsync(plan, SelectedPlan, "イベントカウンター", applied =>
+        await fileActions.ApplyAsync(plan, SelectedPlan, BackupLocation.BackupRoot, "イベントカウンター", applied =>
         {
             plan = null;
             if (!applied) return;
@@ -182,11 +184,12 @@ public partial class EventCountersWindow : Window
     private void SetBusy(bool value)
     {
         busy = value;
+        BackupLocation.IsEnabled = !value;
         AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = SourcePath.IsEnabled = FilterText.IsEnabled = SelectVisibleButton.IsEnabled = ClearVisibleButton.IsEnabled = !value;
         SelectAllButton.IsEnabled = ClearAllButton.IsEnabled = SelectRowsButton.IsEnabled = ClearRowsButton.IsEnabled = !value;
         PreviewButton.IsEnabled = !value && scan is not null;
         FileList.IsEnabled = CandidateList.IsEnabled = QuantityEditor.IsEnabled = scan is not null && (!value || previewBuilding);
-        var availability = PlanAvailability.For(plan, SelectedPlan, value);
+        var availability = PlanAvailability.For(plan, SelectedPlan, value).WithBackupRoot(SelectedPlan, BackupLocation.BackupRoot);
         ExportButton.IsEnabled = availability.CanExport;
         ApplyButton.IsEnabled = availability.CanApply; ApplyButton.ToolTip = availability.ApplyHint;
         CancelButton.IsEnabled = value && cancellation is not null;

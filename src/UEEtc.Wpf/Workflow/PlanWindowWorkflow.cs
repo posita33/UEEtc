@@ -40,7 +40,7 @@ internal sealed class PlanWindowWorkflow
         view.Button("CancelButton").Click += (_, _) => cancellation?.Cancel();
         view.Button("BrowseButton").Click += (_, _) => Browse();
         view.Button("ExportButton").Click += async (_, _) => await actions.ExportAsync(SelectedPlan);
-        view.Button("ApplyButton").Click += async (_, _) => await actions.ApplyAsync(plan, SelectedPlan, description, _ => plan = null);
+        view.Button("ApplyButton").Click += async (_, _) => await actions.ApplyAsync(plan, SelectedPlan, view.BackupLocation.BackupRoot, description, _ => plan = null);
         BindSelection("SelectAllButton", () => files, true);
         BindSelection("ClearAllButton", () => files, false);
         BindSelection("SelectVisibleButton", () => view.Files.Items.OfType<ISelectionRow>(), true);
@@ -53,6 +53,8 @@ internal sealed class PlanWindowWorkflow
             cancellation?.Cancel(); e.Cancel = true; view.Status.Text = "処理終了後に閉じてください。";
         };
         var inputs = new RememberedInputs(owner, settings, text => view.Status.Text = text);
+        view.BackupLocation.Initialize(inputs, key);
+        view.BackupLocation.Changed += (_, _) => SetBusy(IsBusy);
         inputs.Bind(view.SourcePath, key + ".SourcePath"); inputs.Bind(view.Filter, key + ".Filter");
         FolderDropInput.Attach(view.SourcePath, text => view.Status.Text = text); inputs.ReportLoadError();
     }
@@ -110,10 +112,11 @@ internal sealed class PlanWindowWorkflow
     private void SetBusy(bool value, bool canCancel = false)
     {
         IsBusy = value;
+        view.BackupLocation.IsEnabled = !value;
         view.SourcePath.IsEnabled = view.Filter.IsEnabled = view.Files.IsEnabled = view.CpuMacro.IsEnabled = view.AllFunctions.IsEnabled = !value;
         foreach (string name in SelectionButtons.Concat(["BrowseButton", "AnalyzeButton"])) view.Button(name).IsEnabled = !value;
         view.Button("CancelButton").IsEnabled = value && canCancel;
-        var availability = PlanAvailability.For(plan, SelectedPlan, value);
+        var availability = PlanAvailability.For(plan, SelectedPlan, value).WithBackupRoot(SelectedPlan, view.BackupLocation.BackupRoot);
         view.Button("ExportButton").IsEnabled = availability.CanExport;
         view.Button("ApplyButton").IsEnabled = availability.CanApply; view.Button("ApplyButton").ToolTip = availability.ApplyHint;
         view.Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;

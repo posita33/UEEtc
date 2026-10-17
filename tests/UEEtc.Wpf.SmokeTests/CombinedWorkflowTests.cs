@@ -48,7 +48,7 @@ internal static class CombinedWorkflowTests
             check(window.SelectedPlan?.ChangedFiles == 2, "Combined apply selection can exclude individual files");
             check(File.ReadAllText(Path.Combine(source, "Batch.cpp")) == batch, "Combined analysis and preview leave original source unchanged");
             if (screenshots is not null) Program.Screenshot(window, Path.Combine(screenshots, "combined.png"), 1360, 900);
-            plan = window.SelectedPlan!; string backup = new SourceWorkspace().Apply(plan);
+            plan = window.SelectedPlan!; string backup = new SourceWorkspace().Apply(plan, Path.Combine(root, "Backups"));
             check(File.ReadAllText(Path.Combine(source, "Batch.cpp")).Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR") && File.ReadAllText(Path.Combine(source, "Batch.cpp")).Contains("TRACE_COUNTER_ADD"), "Combined apply writes both features together");
             check(File.ReadAllText(Path.Combine(source, "EventOnly.cpp")) == eventOnly && File.ReadAllText(Path.Combine(backup, "Batch.cpp")) == batch, "Combined backup preserves original and excluded sources are unchanged");
             ((TextBox)window.FindName("SourcePath")).Text += "-changed";

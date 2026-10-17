@@ -71,15 +71,16 @@ public sealed class SourceWorkspace
     }
 
     // Called only by an explicit UI / CLI apply action. The experiment uses Analyze / Export only.
-    public string Apply(AnalysisPlan plan)
+    public string Apply(AnalysisPlan plan, string? backupRoot = null)
     {
         if (plan.RequiresQuantityConfirmation) throw new InvalidOperationException("数量 ADD の意味・単位が未確認です。確認してプレビューを更新してください。");
         if (plan.DiagnosticCount > 0) throw new InvalidOperationException("診断のある解析結果は適用できません。");
         var changes = plan.Files.Where(f => f.HasChanges).ToArray();
         if (changes.Length == 0) throw new InvalidOperationException("適用する変更がありません。");
+        string location = BackupStorage.ResolveRoot(plan.RootPath, backupRoot);
         foreach (var file in changes) ValidateUnchanged(plan.RootPath, file);
-        string backup = Path.Combine(plan.RootPath, ".ueetc-backups", DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff") + "-" + Guid.NewGuid().ToString("N")[..8]);
-        EnsureNoLinks(backup);
+        string backup = Path.Combine(location, DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff") + "-" + Guid.NewGuid().ToString("N"));
+        BackupStorage.ResolveRoot(plan.RootPath, backup);
         // Back up every file before the first source write.
         foreach (var file in changes)
         {

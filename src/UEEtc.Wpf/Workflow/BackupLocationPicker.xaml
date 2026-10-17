@@ -1,0 +1,10 @@
+<UserControl x:Class="UEEtc.Wpf.Workflow.BackupLocationPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <TextBlock Text="バックアップ先" DockPanel.Dock="Left" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="保存先を選択…" Padding="12,6" Margin="8,0,0,0" Click="Browse_Click" />
+        <TextBox x:Name="PathInput" Padding="8" VerticalContentAlignment="Center"
+                 ToolTip="ソースフォルダー外のフルパスを指定。適用ごとに日時とIDのサブフォルダーを作ります。設定は次回も復元します。" />
+    </DockPanel>
+</UserControl>
