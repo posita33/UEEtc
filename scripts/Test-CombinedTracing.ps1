@@ -144,9 +144,15 @@ if ($env:VSCMD_ARG_TGT_ARCH -ne 'x64' -or !(Get-Command cl.exe -ErrorAction Sile
     Import-Module (Join-Path $vsPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
     Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
 }
-foreach ($macro in @('auto','str')) {
+@'
+#pragma once
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#define PROJECT_TRACE_CPU_SCOPE_STR(Name) TRACE_CPUPROFILER_EVENT_SCOPE_STR(Name)
+'@ | Set-Content (Join-Path $stubs 'ProjectCpuTrace.h') -Encoding utf8
+foreach ($macro in @('standard','custom')) {
     $output = Join-Path $runRoot $macro
-    dotnet $cli combined $source --cpu-macro $macro --report $output
+    $cpuArguments = @(if ($macro -eq 'custom') { '--cpu-macro-name'; 'PROJECT_TRACE_CPU_SCOPE_STR'; '--cpu-header'; 'ProjectCpuTrace.h' })
+    dotnet $cli combined $source @cpuArguments --report $output
     if ($LASTEXITCODE -ne 0) { throw 'Combined preview failed.' }
     git -C $source apply --check (Join-Path $output 'changes.patch')
     if ($LASTEXITCODE -ne 0) { throw 'Combined patch check failed.' }

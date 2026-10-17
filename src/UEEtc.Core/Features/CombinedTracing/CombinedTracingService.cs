@@ -7,9 +7,10 @@ namespace UEEtc.Core.Features.CombinedTracing;
 
 public sealed class CombinedTracingService
 {
-    public AnalysisPlan Analyze(string rootPath, bool focusedCpu = true, CpuMacroKind cpuMacro = CpuMacroKind.Auto,
+    public AnalysisPlan Analyze(string rootPath, bool focusedCpu = true, CpuTraceSettings? cpuTrace = null,
         IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
+        cpuTrace = (cpuTrace ?? new()).Validated();
         // One filesystem discovery and one original-byte snapshot for both independent policies.
         var events = new EventCounterService();
         var scan = events.Analyze(rootPath, progress, cancellationToken);
@@ -19,7 +20,7 @@ public sealed class CombinedTracingService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var file = proposal.Source;
-            var cpuProposal = cpu.Propose(file.RelativePath, file.OriginalBytes, new(FocusedCpu: focusedCpu, CpuMacro: cpuMacro));
+            var cpuProposal = cpu.Propose(file.RelativePath, file.OriginalBytes, new(FocusedCpu: focusedCpu, CpuTrace: cpuTrace));
             return FileProposal.Merge(cpuProposal, proposal).Render();
         }).ToArray();
         return scan.Snapshot with { Feature = "CombinedTracing", Files = files };

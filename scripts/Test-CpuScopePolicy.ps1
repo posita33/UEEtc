@@ -1,4 +1,3 @@
-param([ValidateSet('auto','scope','str')][string]$CpuMacro = 'auto')
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/cpu-policy-cpp/' + [guid]::NewGuid().ToString('N'))
@@ -77,7 +76,7 @@ struct Counter { std::atomic<int> Value{0}; explicit Counter(const wchar_t*) {} 
 '@, $utf8)
 $cli = Join-Path $repoRoot 'src/UEEtc.Console/bin/Release/net10.0/UEEtc.Console.dll'
 $output = Join-Path $runRoot 'preview'
-dotnet $cli $sourceDir --both --cpu-macro $CpuMacro --report $output
+dotnet $cli $sourceDir --both --report $output
 if ($LASTEXITCODE -ne 0) { throw 'Preview failed.' }
 git -C $sourceDir apply --check (Join-Path $output 'changes.patch')
 if ($LASTEXITCODE -ne 0) { throw 'Patch check failed.' }

@@ -17,6 +17,6 @@ public partial class CpuTracingWindow : Window
         InitializeComponent();
         workflow = new(this, settings, "CpuTracing", "CPUスコープ",
             static (root, focused, macro, progress, token) => new InstrumentationService().Analyze(root,
-                new(FocusedCpu: focused, CpuMacro: macro), progress, token));
+                new(FocusedCpu: focused, CpuTrace: macro), progress, token));
     }
 }

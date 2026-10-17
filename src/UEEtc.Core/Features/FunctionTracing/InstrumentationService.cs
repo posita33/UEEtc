@@ -11,6 +11,7 @@ public sealed class InstrumentationService
         IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         options ??= new();
+        options = options with { CpuTrace = (options.CpuTrace ?? new()).Validated() };
         if (!options.CpuScopes && !options.CallCounters)
             throw new ArgumentException("CPU スコープまたは進入回数カウンターを選択してください。");
         var reserved = new HashSet<string>(StringComparer.Ordinal);

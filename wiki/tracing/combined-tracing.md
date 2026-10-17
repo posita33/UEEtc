@@ -26,7 +26,7 @@ status: todo
 全解除した場合は適用できず、自動で全件適用に戻すこともない。
 検索で隠れたファイルの選択は保持する。全体・表示中・強調行の選択/解除、Ctrl/Shift・Spaceにも対応する。
 
-CPUは従来どおり対象の絞り込みを標準にする。「全関数（互換）」と自動/通常形/固定STRの選択も利用できる。
+CPUは対象の絞り込みを標準にし、「全関数（互換）」で解除できる。新規追加はSTR形式に統一し、[独自マクロ名と定義ヘッダー](custom-cpu-str.md)を指定できる。
 設定を変更した場合は変更案を無効にし、再解析する。
 ソースパス・検索条件は統合画面専用のキーで保存し、個別画面の入力とは分ける。計画や適用選択は保存しない。
 
@@ -95,7 +95,7 @@ dotnet run --project src/UEEtc.Console -- combined "D:/Game/Source" --report "D:
 CPUの設定例:
 
 ```powershell
-dotnet run --project src/UEEtc.Console -- combined "D:/Game/Source" --all-functions --cpu-macro str --report "D:/TraceReports/combined-str"
+dotnet run --project src/UEEtc.Console -- combined "D:/Game/Source" --all-functions --cpu-macro-name PROJECT_TRACE_CPU_SCOPE_STR --cpu-header Tracing/ProjectCpuTrace.h --report "D:/TraceReports/combined-str"
 ```
 
 統合コマンドでは、対象となるイベント候補と自動推奨を一括生成する。

@@ -10,7 +10,7 @@ internal static class CpuScopeFocus
         "Serialize", "Deserialize", "Compress", "Decompress", "Uncompress", "Flush", "Wait",
         "WaitForCompletion", "ParallelFor", "LoadFileToArray", "SaveArrayToFile", "Sort", "StableSort"
     };
-    public static (bool Include, string Reason) Evaluate(IReadOnlyList<CppToken> tokens, int position, int close)
+    public static (bool Include, string Reason) Evaluate(IReadOnlyList<CppToken> tokens, int position, int close, string cpuMacro)
     {
         int calls = 0;
         for (int i = 0; i < close; i++)
@@ -30,7 +30,7 @@ internal static class CpuScopeFocus
             if (name is "for" or "while" or "do") return (true, "繰り返し処理あり（実行回数・コストは未測定）");
             if (i + 1 >= close || tokens[i + 1].Text != "(" || !char.IsAsciiLetter(name.FirstOrDefault())) continue;
             if (Operations.Contains(name)) return (true, "明示的なデータ処理・待機 API: " + name + "（コストは未測定）");
-            if (name is "if" or "switch" or "catch" or "sizeof" or "alignof" or "static_cast" or "const_cast" or "reinterpret_cast" ||
+            if (name == cpuMacro || name is "if" or "switch" or "catch" or "sizeof" or "alignof" or "static_cast" or "const_cast" or "reinterpret_cast" ||
                 name.StartsWith("Get", StringComparison.Ordinal) || name.StartsWith("Is", StringComparison.Ordinal) ||
                 name.StartsWith("Has", StringComparison.Ordinal) || name.StartsWith("Can", StringComparison.Ordinal) ||
                 name.StartsWith("UE_", StringComparison.Ordinal) || name.StartsWith("TRACE_", StringComparison.Ordinal) || name is "check" or "checkf" or "ensure" or "ensureMsgf") continue;

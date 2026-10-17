@@ -87,6 +87,8 @@ WPF はメイン画面から機能を選び、ソースフォルダーを指定�
 
 CPU はループ・対象API・複数の処理呼び出しを根拠に候補を絞ります。「全関数（互換）」または `cpu <path> --all-functions` で従来の対象に戻せます。[CPU の Engine 調査・使い方・実験結果](wiki/tracing/focused-cpu-and-quantity-counters.md)を参照してください。
 
+CPUの新規付与は固定文字列の `TRACE_CPUPROFILER_EVENT_SCOPE_STR` に統一しています。CPU・統合画面の「CPUマクロ」「定義ヘッダー」で独自ラッパーを指定でき、Consoleは `--cpu-macro-name` と `--cpu-header` に対応します。[設定方法とDevelopment/Test限定のヘッダー例](wiki/tracing/custom-cpu-str.md)を参照してください。
+
 ソースパス欄はフォルダーを 1 つドロップして指定できます。入力したパス・絞り込み・編集したカウンター名は次回起動時にも復元します。候補の選択や適用待ちの変更案は復元しません。[保存内容と保存先](wiki/input-assistance.md)も参照してください。
 
 両方ともレポート・差分・加工済みコピーの保存に対応します。実際に元ファイルを変更する操作は、WPF の「元ファイルへ適用」または Console の `--apply` です。バックアップ先はWPFの各画面、Consoleの `--backup-dir <フルパス>` で指定できます。初期値はソース外の `%LOCALAPPDATA%\UEEtc\Backups` です。[バックアップ先の設定](wiki/tracing/backup-location.md)と[詳細な使い方と制限](wiki/tracing/implementation.md)を参照してください。

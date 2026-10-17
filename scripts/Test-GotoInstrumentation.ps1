@@ -37,9 +37,9 @@ struct CpuGuard { CpuGuard() {} ~CpuGuard() {} };
 @'
 #pragma once
 #if TEST_TRACE_ENABLED
-#define TRACE_CPUPROFILER_EVENT_SCOPE(Name) CpuGuard UE_JOIN(Cpu_,__LINE__);
+#define TRACE_CPUPROFILER_EVENT_SCOPE_STR(Name) CpuGuard UE_JOIN(Cpu_,__LINE__);
 #else
-#define TRACE_CPUPROFILER_EVENT_SCOPE(Name)
+#define TRACE_CPUPROFILER_EVENT_SCOPE_STR(Name)
 #endif
 '@ | Set-Content (Join-Path $stubs 'ProfilingDebugging/CpuProfilerTrace.h') -Encoding utf8
 @'

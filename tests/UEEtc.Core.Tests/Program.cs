@@ -9,7 +9,7 @@ var tests = new (string Name, Action Run)[]
     {
         var file = Analyze("void F::Work() { Run(); }");
         Equal(1, file.AddedFunctions);
-        Contains(file.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE(");
+        Contains(file.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE_STR(");
         Contains(file.ProposedText, "TRACE_DECLARE_ATOMIC_INT_COUNTER");
         Contains(file.ProposedText, "TRACE_COUNTER_INCREMENT");
         Assert(file.ProposedText.StartsWith("#include \"Fixture.h\"\n#include \"ProfilingDebugging/CpuProfilerTrace.h\""));
@@ -228,7 +228,7 @@ var tests = new (string Name, Action Run)[]
         var both = instrumenter.Analyze("Fixture.cpp", cpu.ProposedBytes, new(true, true));
         Equal(0, both.AddedCpuScopes);
         Equal(1, both.AddedCallCounters);
-        Equal(1, Occurrences(both.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE("));
+        Equal(1, Occurrences(both.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE_STR("));
         Equal(1, Occurrences(both.ProposedText, "TRACE_COUNTER_INCREMENT("));
         Assert(!instrumenter.Analyze("Fixture.cpp", both.ProposedBytes, new(true, true)).HasChanges);
     }),
@@ -252,7 +252,7 @@ var tests = new (string Name, Action Run)[]
     ("CPU only and counter only", () =>
     {
         var cpu = Analyze("void Work() { Run(); }", new(true, false));
-        Contains(cpu.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE(");
+        Contains(cpu.ProposedText, "TRACE_CPUPROFILER_EVENT_SCOPE_STR(");
         Assert(!cpu.ProposedText.Contains("TRACE_COUNTER_INCREMENT"));
         Equal(1, cpu.AddedCpuScopes);
         Equal(0, cpu.AddedCallCounters);
@@ -390,6 +390,7 @@ tests = tests.Concat(AutomaticCounterTests.All).ToArray();
 tests = tests.Concat(CombinedTracingTests.All).ToArray();
 tests = tests.Concat(EngineAuditTests.All).ToArray();
 tests = tests.Concat(BackupStorageTests.All).ToArray();
+tests = tests.Concat(CpuCustomizationTests.All).ToArray();
 int failures = 0;
 foreach (var test in tests)
 {

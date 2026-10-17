@@ -24,7 +24,7 @@ status: todo
 
 | 確認事項 | Engineの参照箇所 | 現行実装の扱い |
 | --- | --- | --- |
-| 通常形と固定STR | `Source/Runtime/Core/Public/ProfilingDebugging/CpuProfilerTrace.h:390–454` | 通常形は名前を文字列化してSTRへ進む。ASCIIの固定ラベルは通常形、必要に応じ固定リテラルのSTR。両者を速度の異なる別方式とは扱わない |
+| 通常形と固定STR | `Source/Runtime/Core/Public/ProfilingDebugging/CpuProfilerTrace.h:390–454` | 通常形は名前を文字列化してSTRへ進む。両者を速度の異なる別方式とは扱わない。Issue #53からツールの新規生成は固定STR形式へ統一し、独自名とヘッダーにも対応 |
 | 動的名 | 同上 `:473–490` | 別のTEXT系がある。変化する名前をSTRへ渡さない。現行の生成は固定名のみ |
 | カウンター宣言・操作 | `Source/Runtime/Core/Public/ProfilingDebugging/CountersTrace.h:247–249, 288–317, 387–402` | int64のatomic宣言と、同じ識別子への操作を生成。名前は文字列引数ではなく、宣言済みカウンターを参照するトークン |
 | 無効時の展開 | 同上 `:429–488`、CpuProfilerTrace.hの無効時の定義 | マクロの引数評価が消える場合がある。副作用を必要とする式は付与しない |

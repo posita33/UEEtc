@@ -3,14 +3,15 @@ param(
     [string]$BlockBreakerSource = 'D:/Projects/posita/git/Game/BlockBreaker/Source',
     [ValidateSet('cpu', 'counter', 'both')][string]$Mode = 'cpu',
     [switch]$Focused,
-    [ValidateSet('auto','scope','str')][string]$CpuMacro = 'auto'
+    [string]$CpuMacroName = 'TRACE_CPUPROFILER_EVENT_SCOPE_STR',
+    [string]$CpuHeader = 'ProfilingDebugging/CpuProfilerTrace.h'
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $repoRoot ('artifacts/trace-experiments/run-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 [string[]]$modeFlags = @(switch ($Mode) { 'counter' { '--counter-only' } 'both' { '--both' } })
-$modeFlags += @('--cpu-macro', $CpuMacro)
+$modeFlags += @('--cpu-macro-name', $CpuMacroName, '--cpu-header', $CpuHeader)
 if ($Focused -and $Mode -ne 'cpu') { throw 'Focused is supported only with cpu mode.' }
 [string[]]$commandPrefix = @(); if ($Focused) { $commandPrefix = @('cpu') }
 

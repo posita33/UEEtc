@@ -10,7 +10,7 @@ using UEEtc.Wpf.Preview;
 
 namespace UEEtc.Wpf.Workflow;
 
-internal delegate AnalysisPlan AnalyzePlan(string root, bool focusedCpu, CpuMacroKind macro, IProgress<string> progress, CancellationToken token);
+internal delegate AnalysisPlan AnalyzePlan(string root, bool focusedCpu, CpuTraceSettings cpuTrace, IProgress<string> progress, CancellationToken token);
 
 // Shared single-plan workflow. Feature rules stay in Core; event editing keeps its own workflow.
 internal sealed class PlanWindowWorkflow
@@ -32,7 +32,6 @@ internal sealed class PlanWindowWorkflow
         actions = new(owner, value => SetBusy(value), text => view.Status.Text = text, ShowError);
         SelectionActions.Attach(view.Files);
         view.SourcePath.TextChanged += InputsChanged;
-        view.CpuMacro.SelectionChanged += InputsChanged;
         view.AllFunctions.Click += InputsChanged;
         view.Filter.TextChanged += (_, _) => FilterFiles();
         view.Files.SelectionChanged += (_, _) => ShowFile();
@@ -53,6 +52,8 @@ internal sealed class PlanWindowWorkflow
             cancellation?.Cancel(); e.Cancel = true; view.Status.Text = "処理終了後に閉じてください。";
         };
         var inputs = new RememberedInputs(owner, settings, text => view.Status.Text = text);
+        view.CpuTrace.Initialize(inputs, key);
+        view.CpuTrace.Changed += (_, _) => InputsChanged(owner, new RoutedEventArgs());
         view.BackupLocation.Initialize(inputs, key);
         view.BackupLocation.Changed += (_, _) => SetBusy(IsBusy);
         inputs.Bind(view.SourcePath, key + ".SourcePath"); inputs.Bind(view.Filter, key + ".Filter");
@@ -83,12 +84,12 @@ internal sealed class PlanWindowWorkflow
         if (IsBusy) return;
         Clear();
         string root = view.SourcePath.Text.Trim(); bool focused = view.AllFunctions.IsChecked != true;
-        var macro = view.CpuMacro.SelectedIndex switch { 1 => CpuMacroKind.Scope, 2 => CpuMacroKind.StaticString, _ => CpuMacroKind.Auto };
+        var cpuTrace = view.CpuTrace.Settings;
         using var cts = new CancellationTokenSource(); cancellation = cts; SetBusy(true, canCancel: true);
         try
         {
             var progress = new Progress<string>(path => view.Status.Text = "解析中: " + path);
-            var analyzed = await Task.Run(() => analyze(root, focused, macro, progress, cts.Token));
+            var analyzed = await Task.Run(() => analyze(root, focused, cpuTrace, progress, cts.Token));
             cts.Token.ThrowIfCancellationRequested();
             plan = analyzed;
             files = plan.Files.Select(f => new SelectableFile(f, SelectionChanged, initiallySelected: true)).ToList();
@@ -113,7 +114,7 @@ internal sealed class PlanWindowWorkflow
     {
         IsBusy = value;
         view.BackupLocation.IsEnabled = !value;
-        view.SourcePath.IsEnabled = view.Filter.IsEnabled = view.Files.IsEnabled = view.CpuMacro.IsEnabled = view.AllFunctions.IsEnabled = !value;
+        view.SourcePath.IsEnabled = view.Filter.IsEnabled = view.Files.IsEnabled = view.CpuTrace.IsEnabled = view.AllFunctions.IsEnabled = !value;
         foreach (string name in SelectionButtons.Concat(["BrowseButton", "AnalyzeButton"])) view.Button(name).IsEnabled = !value;
         view.Button("CancelButton").IsEnabled = value && canCancel;
         var availability = PlanAvailability.For(plan, SelectedPlan, value).WithBackupRoot(SelectedPlan, view.BackupLocation.BackupRoot);

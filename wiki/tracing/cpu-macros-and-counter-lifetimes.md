@@ -6,6 +6,8 @@ status: todo
 
 # CPU マクロの選択とカウンターの生存区間（Issue #32・#33）
 
+CPUの現行仕様は[Issue #53のSTR統一と独自マクロ設定](custom-cpu-str.md)を参照。以下の自動/通常形/STR選択と `--cpu-macro` はIssue #32当時の仕様であり、現在は廃止している。Engineの固定名・動的名の調査とカウンターの生存区間の区別は引き続き有効。
+
 イベントの最新の自動設定は [Issue #35](automatic-counter-preview.md) を参照してください。以下のスコープ現在数への手動切替に加え、累積回数を保持する別カウンターの自動追加を実装しています。
 
 [目次](../README.md) / [現行のファイル選択](event-files-and-input-quantities.md)
