@@ -14,7 +14,7 @@ internal static class CombinedTracingTests
             var plan = new CombinedTracingService().Analyze(root); var f = plan.Files.Single();
             Check(plan.Feature == "CombinedTracing" && plan.AddedCpuScopes == 1 && plan.AddedEventCounters == 1 && plan.AddedQuantityCounters == 1 && plan.AddedDecrements == 1);
             Check(plan.AddedCallCounters == 0 && plan.DiagnosticCount == 0 && !plan.RequiresQuantityConfirmation);
-            Check(f.ProposedText.IndexOf("Super::Work", StringComparison.Ordinal) < f.ProposedText.IndexOf("TRACE_CPUPROFILER_EVENT_SCOPE(", StringComparison.Ordinal));
+            Check(f.ProposedText.IndexOf("Super::Work", StringComparison.Ordinal) < f.ProposedText.IndexOf("TRACE_CPUPROFILER_EVENT_SCOPE_STR(", StringComparison.Ordinal));
             foreach (string header in new[] { "CpuProfilerTrace.h", "CountersTrace.h", "ScopeExit.h" }) Check(f.ProposedText.Split(header).Length == 2);
             Check(f.ProposedText.StartsWith("#include \"Fixture.h\"\n#include \"ProfilingDebugging/CpuProfilerTrace.h\"", StringComparison.Ordinal));
             Check(f.OriginalText == Batch && File.ReadAllText(Path.Combine(root, "A.cpp")) == Batch);
@@ -48,7 +48,7 @@ internal static class CombinedTracingTests
         {
             var utf8 = new UTF8Encoding(true); string text = Batch.Replace("\n", "\r\n", StringComparison.Ordinal);
             File.WriteAllBytes(Path.Combine(root, "A.cpp"), [..utf8.GetPreamble(), ..utf8.GetBytes(text)]);
-            var plan = new CombinedTracingService().Analyze(root, cpuMacro: CpuMacroKind.StaticString); var f = plan.Files.Single();
+            var plan = new CombinedTracingService().Analyze(root); var f = plan.Files.Single();
             Check(plan.AddedStringCpuScopes == 1 && f.ProposedBytes.AsSpan().StartsWith(utf8.GetPreamble()));
             Check(!f.ProposedText.Replace("\r\n", "", StringComparison.Ordinal).Contains('\n'));
         })),

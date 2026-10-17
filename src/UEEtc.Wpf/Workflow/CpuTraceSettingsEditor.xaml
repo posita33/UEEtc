@@ -1,0 +1,14 @@
+<UserControl x:Class="UEEtc.Wpf.Workflow.CpuTraceSettingsEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <TextBlock Text="CPUマクロ（固定文字列1引数）" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <TextBox x:Name="MacroNameInput" Grid.Column="1" Padding="6"
+                 ToolTip="標準はTRACE_CPUPROFILER_EVENT_SCOPE_STR。独自のスコープマクロ名も指定できます。" />
+        <TextBlock Grid.Row="1" Text="定義ヘッダー（includeパス）" VerticalAlignment="Center" Margin="0,6,8,0" />
+        <TextBox x:Name="HeaderInput" Grid.Row="1" Grid.Column="1" Padding="6" Margin="0,6,0,0"
+                 ToolTip="例: Tracing/ProjectCpuTrace.h。モジュールからincludeできる相対パス。独自ヘッダーはプロジェクト側で用意してください。" />
+    </Grid>
+</UserControl>

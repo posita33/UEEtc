@@ -14,10 +14,10 @@ static int Run(string[] arguments)
     {
         Console.WriteLine("UEEtc - Unreal Engine trace instrumentation (.NET 10)");
         Console.WriteLine("Usage: UEEtc.Console cpu <source-full-path> [--all-functions] [--report <empty-output-full-path>] [--apply]");
-        Console.WriteLine("       UEEtc.Console combined <source-full-path> [--all-functions] [--cpu-macro auto|scope|str] [--report <empty-output-full-path>] [--apply]");
+        Console.WriteLine("       UEEtc.Console combined <source-full-path> [--all-functions] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("combined previews CPU scopes and all eligible event branches with recommended ADD/scoped counters in one plan. It is different from legacy --both function-entry counts.");
         Console.WriteLine("cpu defaults to static-evidence filtering (loops, known data/wait APIs, 4+ action calls). Cost is not measured. --all-functions retains broad instrumentation.");
-        Console.WriteLine("--cpu-macro auto|scope|str chooses the fixed-label CPU macro. SCOPE and STR use the same static ID path; STR is not the dynamic TEXT macro.");
+        Console.WriteLine("CPU always emits a fixed string argument. Default: TRACE_CPUPROFILER_EVENT_SCOPE_STR. --cpu-macro-name <identifier> and --cpu-header <include-path> select a project wrapper/header for cpu, combined and legacy commands.");
         Console.WriteLine("       UEEtc.Console counters <source-full-path> [--selection <selection.json>] [--recommended-add | --recommended-counters] [--report <empty-output-full-path>] [--apply]");
         Console.WriteLine("counters: discover braced if/else branches; select none by default. --report exports candidates.json and an empty selection.json.");
         Console.WriteLine("Copy reviewed Id / CounterName / DisplayName into Selections; --selection validates the source fingerprint before preview/apply.");
@@ -49,7 +49,7 @@ static int Run(string[] arguments)
         string? report = null, backupRoot = null;
         InstrumentationOptions options = new(FocusedCpu: cpuCommand || combinedCommand);
         bool modeChosen = false;
-        bool macroChosen = false;
+        bool macroChosen = false, headerChosen = false;
         for (int i = 1; i < arguments.Length; i++)
         {
             switch (arguments[i])
@@ -62,9 +62,12 @@ static int Run(string[] arguments)
                     options = options with { CpuScopes = false, CallCounters = true }; modeChosen = true; break;
                 case "--both" when !modeChosen && !cpuCommand && !combinedCommand:
                     options = options with { CpuScopes = true, CallCounters = true }; modeChosen = true; break;
-                case "--cpu-macro" when !macroChosen && i + 1 < arguments.Length:
-                    options = options with { CpuMacro = arguments[++i] switch { "auto" => CpuMacroKind.Auto, "scope" => CpuMacroKind.Scope, "str" => CpuMacroKind.StaticString, _ => throw new ArgumentException("--cpu-macro は auto / scope / str を指定してください。") } };
+                case "--cpu-macro-name" when !macroChosen && i + 1 < arguments.Length:
+                    options = options with { CpuTrace = (options.CpuTrace ?? new()) with { MacroName = arguments[++i] } };
                     macroChosen = true; break;
+                case "--cpu-header" when !headerChosen && i + 1 < arguments.Length:
+                    options = options with { CpuTrace = (options.CpuTrace ?? new()) with { Header = arguments[++i] } };
+                    headerChosen = true; break;
                 case "--report" when i + 1 < arguments.Length && report is null:
                     report = arguments[++i]; break;
                 case "--apply" when !apply:
@@ -77,7 +80,7 @@ static int Run(string[] arguments)
         }
         var service = new InstrumentationService();
         if (options.CallCounters) Console.Error.WriteLine("Legacy function-entry counts selected. For reviewed event locations use the separate counters command.");
-        var plan = combinedCommand ? new CombinedTracingService().Analyze(root, options.FocusedCpu, options.CpuMacro, cancellationToken: cancellation.Token)
+        var plan = combinedCommand ? new CombinedTracingService().Analyze(root, options.FocusedCpu, options.CpuTrace, cancellationToken: cancellation.Token)
             : service.Analyze(root, options, cancellationToken: cancellation.Token);
         Console.WriteLine(ReportExporter.Summary(plan));
         foreach (var file in plan.Files.Where(f => f.HasChanges))

@@ -56,7 +56,7 @@ flowchart TD
 安全な無条件includeの挿入位置がない場合も追加しない。
 
 既存の`TRACE_CPUPROFILER*`、`SCOPE_CYCLE_COUNTER`系、`SCOPED_NAMED_EVENT*`が関数内にあればCPU計測を維持する。
-コメント・文字列内のマクロ名は既存計測と数えない。既存のSTRやTEXTを通常形へ置換する機能ではない。
+コメント・文字列内のマクロ名は既存計測と数えない。設定した独自CPUマクロの既存呼び出しも保持し、既存計測を別形式へ置換しない。
 
 WPFと現行Consoleの`cpu`コマンドは、さらに[CpuScopeFocus](../../src/UEEtc.Core/Features/FunctionTracing/CpuScopeFocus.cs)で以下のいずれかを確認する。
 
@@ -81,16 +81,15 @@ Super後に挿入する場合は、その後の領域に対して判定する。
 4. Super後に処理が残っていなければ追加しない。
 
 [CpuScopeMacro](../../src/UEEtc.Core/Features/FunctionTracing/CpuScopeMacro.cs)は、通常「クラス名 関数名」の固定ラベルを作る。
-自動モードではASCII識別子を空白で区切った名前なら通常形、それ以外は固定文字列のSTRを選ぶ。設定で通常形・STRも指定できる。
+新規追加は固定文字列のSTR形式に統一した。標準名とEngineヘッダーを使うほか、[独自マクロ名・定義ヘッダー](custom-cpu-str.md)を指定できる。
 
 生成イメージ（`AAnalyzer.cpp`の本体内、Super直後）:
 
 ```cpp
-TRACE_CPUPROFILER_EVENT_SCOPE(AAnalyzer Process);
+TRACE_CPUPROFILER_EVENT_SCOPE_STR("AAnalyzer Process");
 ```
 
-通常形の引数はマクロ内で文字列化されるため、この空白区切りの書き方でも固定名になる。
-STRを選ぶ場合は`TRACE_CPUPROFILER_EVENT_SCOPE_STR("AAnalyzer Process");`となる。
+独自マクロを指定した場合も、同じ固定文字列を1引数として渡す。ヘッダー側でビルド構成による有効・無効を切り替えられる。
 UE 5.8では通常形とSTRは同じ静的IDの経路を通る。**STRは動的文字列専用ではない**。
 毎回変わる名前には別のTEXT系があるが、現行ツールは生成しない。
 
@@ -98,7 +97,7 @@ UE 5.8では通常形とSTRは同じ静的IDの経路を通る。**STRは動的�
 
 | Engine内のパス・行 | 確認した内容 | ツールへの反映 |
 | --- | --- | --- |
-| `Source/Runtime/Core/Public/ProfilingDebugging/CpuProfilerTrace.h:19–25, 399–409, 445–454` | 有効条件、STRの固定名・静的ID、通常形からSTRへの展開 | 正しいヘッダーと固定ラベル、通常形/STR選択 |
+| `Source/Runtime/Core/Public/ProfilingDebugging/CpuProfilerTrace.h:19–25, 399–409, 445–454` | 有効条件、STRの固定名・静的ID、通常形からSTRへの展開 | STRの固定ラベルと、定義を提供するヘッダーの指定 |
 | 同上 `:253–277, 283–342, 473–490` | 静的IDと動的名は経路が異なる | 固定名を標準とし、動的名は別候補にする |
 | `Source/Runtime/Engine/Private/AssetCompilingManager.cpp:674–680` | 完了待ちと管理対象のループにCPUスコープ | 待機・一括処理を観測対象とする判断材料 |
 | `Source/Runtime/Engine/Private/InstancedStaticMesh.cpp:433, 778, 1023, 4472` | RHI初期化、バインド、インスタンス一括更新 | 処理単位の時間を観測する判断材料 |

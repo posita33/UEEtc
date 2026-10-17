@@ -9,7 +9,7 @@ internal static class CpuPolicyTests
         ("CPU label contains only class and function, independent of path", () =>
         {
             var file = Analyze("void UMyComponent::BeginPlay() { Work(); }");
-            Check(file.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE(UMyComponent BeginPlay)"));
+            Check(file.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"UMyComponent BeginPlay\")"));
             var other = Analyze("void UMyComponent::BeginPlay() { Work(); }", path: "Other/Deep/File.cpp");
             Check(CpuLine(file) == CpuLine(other));
             Check(!CpuLine(file).Contains("UEEtc/") && !CpuLine(file).Contains('['));
@@ -17,14 +17,14 @@ internal static class CpuPolicyTests
         ("CPU labels use the nearest class and unqualified free function name", () =>
         {
             var file = Analyze("namespace UE::Game { void AThing::Run() { Work(); } void FreeWork() { Work(); } }\nvoid UE::Game::Other::Run() { Work(); }");
-            Check(file.ProposedText.Contains("SCOPE(AThing Run)"));
-            Check(file.ProposedText.Contains("SCOPE(Other Run)"));
-            Check(file.ProposedText.Contains("SCOPE(FreeWork)"));
+            Check(file.ProposedText.Contains("SCOPE_STR(\"AThing Run\")"));
+            Check(file.ProposedText.Contains("SCOPE_STR(\"Other Run\")"));
+            Check(file.ProposedText.Contains("SCOPE_STR(\"FreeWork\")"));
         }),
         ("CPU overload labels intentionally share the requested short name", () =>
         {
             var file = Analyze("void AThing::Run(int n) { Work(); } void AThing::Run(float n) { Work(); }");
-            Check(file.AddedCpuScopes == 2 && file.ProposedText.Split("SCOPE(AThing Run)").Length == 3);
+            Check(file.AddedCpuScopes == 2 && file.ProposedText.Split("SCOPE_STR(\"AThing Run\")").Length == 3);
         }),
         ("Existing CPU labels remain unchanged", () =>
         {
@@ -86,7 +86,7 @@ internal static class CpuPolicyTests
             var file = Analyze("void AThing::Work() { Super::Work(); DerivedWork(); }", new(true, true));
             int counter = file.ProposedText.IndexOf("TRACE_COUNTER_INCREMENT(", StringComparison.Ordinal);
             int parent = file.ProposedText.IndexOf("Super::Work();", StringComparison.Ordinal);
-            int cpu = file.ProposedText.IndexOf("TRACE_CPUPROFILER_EVENT_SCOPE(", StringComparison.Ordinal);
+            int cpu = file.ProposedText.IndexOf("TRACE_CPUPROFILER_EVENT_SCOPE_STR(", StringComparison.Ordinal);
             Check(counter < parent && parent < cpu && file.AddedCallCounters == 1 && file.AddedCpuScopes == 1);
             var second = new CppInstrumenter().Analyze(file.RelativePath, file.ProposedBytes, new(true, true));
             Check(!second.HasChanges);

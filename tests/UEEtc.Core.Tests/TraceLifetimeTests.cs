@@ -7,30 +7,21 @@ internal static class TraceLifetimeTests
 {
     public static (string Name, Action Run)[] All =>
     [
-        ("Auto and plain CPU macros keep the same fixed label", () =>
+        ("CPU defaults to STR with a fixed label", () =>
         {
-            foreach (var kind in new[] { CpuMacroKind.Auto, CpuMacroKind.Scope })
-            {
-                var f = Cpu("void AThing::Work() { Run(); }", kind);
-                Check(f.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE(AThing Work)"));
-                Check(f.AddedPlainCpuScopes == 1 && f.AddedStringCpuScopes == 0 && f.Functions.Single().CpuScopeLabel == "AThing Work");
-            }
-            var str = Cpu("void AThing::Work() { Run(); }", CpuMacroKind.StaticString);
+            var str = Cpu("void AThing::Work() { Run(); }");
             Check(str.ProposedText.Contains("TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"AThing Work\")") && str.AddedStringCpuScopes == 1);
-            Check(str.Functions.Single().CpuDecision.Contains("静的ID"));
+            Check(str.AddedPlainCpuScopes == 0 && str.Functions.Single().CpuScopeLabel == "AThing Work");
         }),
-        ("Unsafe plain text falls back to a fixed string without generating dynamic TEXT", () =>
+        ("Unicode CPU labels are fixed strings without generating dynamic TEXT", () =>
         {
-            foreach (var kind in new[] { CpuMacroKind.Auto, CpuMacroKind.Scope })
-            {
-                var f = Cpu("void F::Wörk() { Run(); }", kind);
+                var f = Cpu("void F::Wörk() { Run(); }");
                 Check(f.AddedStringCpuScopes == 1 && f.ProposedText.Contains("SCOPE_STR(\"F Wörk\")") && !f.ProposedText.Contains("SCOPE_TEXT"));
-            }
         }),
-        ("Existing STR, SCOPE and dynamic TEXT are preserved under every choice", () =>
+        ("Existing STR, SCOPE and dynamic TEXT are preserved", () =>
         {
             foreach (string macro in new[] { "TRACE_CPUPROFILER_EVENT_SCOPE(Existing)", "TRACE_CPUPROFILER_EVENT_SCOPE_STR(\"Existing\")", "TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(Name)" })
-                foreach (var kind in Enum.GetValues<CpuMacroKind>()) Check(!Cpu("void F::Work() { " + macro + "; Run(); }", kind).HasChanges);
+                Check(!Cpu("void F::Work() { " + macro + "; Run(); }").HasChanges);
         }),
         ("Existing counter instrumentation does not qualify a tiny function for focused CPU tracing", () =>
         {
@@ -71,7 +62,7 @@ internal static class TraceLifetimeTests
             Check(service.TryBuildPreview(scan, [bad]).Plan is null);
         }))
     ];
-    private static UEEtc.Core.Plans.FileAnalysis Cpu(string source, CpuMacroKind kind) => new CppInstrumenter().Analyze("F.cpp", Encoding.UTF8.GetBytes("#include \"F.h\"\n" + source), new(CpuMacro: kind));
+    private static UEEtc.Core.Plans.FileAnalysis Cpu(string source) => new CppInstrumenter().Analyze("F.cpp", Encoding.UTF8.GetBytes("#include \"F.h\"\n" + source), new());
     private static void Scan(Action<EventCounterService, EventCounterScan, string> action)
     {
         string root = Path.Combine(Path.GetTempPath(), "UEEtc-lifetime-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);

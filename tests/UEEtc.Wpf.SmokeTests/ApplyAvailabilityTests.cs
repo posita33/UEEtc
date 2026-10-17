@@ -42,6 +42,16 @@ internal static class ApplyAvailabilityTests
                 var backupLocation = (BackupLocationPicker)window.FindName("BackupLocation");
                 var backupInput = (TextBox)backupLocation.FindName("PathInput");
                 check(backupLocation.BackupRoot == BackupStorage.DefaultRoot, feature + " default backup folder is outside source");
+                if (feature != "Events")
+                {
+                    var editor = (CpuTraceSettingsEditor)window.FindName("CpuTraceSettings");
+                    check(window.FindName("CpuMacroOption") is null && editor.Settings.MacroName == "TRACE_CPUPROFILER_EVENT_SCOPE_STR", feature + " offers STR settings without an auto/plain selector");
+                    ((TextBox)editor.FindName("MacroNameInput")).Text = "PROJECT_TRACE_CPU_SCOPE_STR";
+                    ((TextBox)editor.FindName("HeaderInput")).Text = "Tracing/ProjectCpuTrace.h";
+                    check(Selected() is null && !((Button)window.FindName("ApplyButton")).IsEnabled, feature + " editing macro settings invalidates the old preview");
+                    ((Button)window.FindName("AnalyzeButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Until(() => !Busy());
+                    check(Selected()!.Files.Single().ProposedText.Contains("PROJECT_TRACE_CPU_SCOPE_STR(\"F Work\")") && Selected()!.Files.Single().ProposedText.Contains("#include \"Tracing/ProjectCpuTrace.h\""), feature + " custom macro and header reach preview together");
+                }
                 string proposal = Selected()!.Files.Single().ProposedText;
                 foreach (string invalid in new[] { source, Path.Combine(source, "Backup"), "", "relative" })
                 {
@@ -80,7 +90,15 @@ internal static class ApplyAvailabilityTests
             }
             finally { window.Close(); }
             var restarted = Create(new InputSettingsStore(settings.Path));
-            try { check(((BackupLocationPicker)restarted.FindName("BackupLocation")).BackupRoot == customBackup, feature + " backup location survives reopening with settings reloaded from disk"); }
+            try
+            {
+                check(((BackupLocationPicker)restarted.FindName("BackupLocation")).BackupRoot == customBackup, feature + " backup location survives reopening with settings reloaded from disk");
+                if (feature != "Events")
+                {
+                    var saved = ((CpuTraceSettingsEditor)restarted.FindName("CpuTraceSettings")).Settings;
+                    check(saved.MacroName == "PROJECT_TRACE_CPU_SCOPE_STR" && saved.Header == "Tracing/ProjectCpuTrace.h", feature + " CPU macro and header survive reopening with settings reloaded from disk");
+                }
+            }
             finally { restarted.Close(); }
 
             Window Create(InputSettingsStore store) => feature switch { "CPU" => new CpuTracingWindow(store), "Events" => new EventCountersWindow(store), _ => new CombinedTracingWindow(store) };

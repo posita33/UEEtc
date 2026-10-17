@@ -21,6 +21,7 @@ public sealed class CppInstrumenter
 
     internal FileProposal Propose(string relativePath, byte[] bytes, InstrumentationOptions options)
     {
+        var cpuTrace = (options.CpuTrace ?? new()).Validated();
         var functions = new List<FunctionAnalysis>();
         var diagnostics = new List<string>();
         try
@@ -44,9 +45,9 @@ public sealed class CppInstrumenter
             if (edits.Count > 0)
             {
                 string declarations = "";
-                if (needsCpuHeader && !Includes(includes, "CpuProfilerTrace.h"))
-                    declarations += "#include \"ProfilingDebugging/CpuProfilerTrace.h\"" + newline;
-                if (needsCounterHeader && !Includes(includes, "CountersTrace.h"))
+                if (needsCpuHeader && !Includes(includes, cpuTrace.Header))
+                    declarations += "#include \"" + cpuTrace.Header + "\"" + newline;
+                if (needsCounterHeader && !Includes(includes, "ProfilingDebugging/CountersTrace.h"))
                     declarations += "#include \"ProfilingDebugging/CountersTrace.h\"" + newline;
                 if (counters.Count > 0)
                     declarations += newline +
@@ -116,12 +117,12 @@ public sealed class CppInstrumenter
                     });
                     return;
                 }
-                bool existingCpu = HasCall(t => t.StartsWith("TRACE_CPUPROFILER", StringComparison.Ordinal) ||
+                bool existingCpu = HasCall(t => t == cpuTrace.MacroName || t.StartsWith("TRACE_CPUPROFILER", StringComparison.Ordinal) ||
                     t.Contains("SCOPE_CYCLE_COUNTER", StringComparison.Ordinal) || t.StartsWith("SCOPED_NAMED_EVENT", StringComparison.Ordinal));
                 bool existingCounter = HasCall(t => t.StartsWith("TRACE_COUNTER_", StringComparison.Ordinal));
                 var cpuPlacement = CpuScopePlacement.Find(name, tokens, scanned, open, close);
                 var focus = cpuPlacement.Position is { } position && options.FocusedCpu
-                    ? CpuScopeFocus.Evaluate(tokens, position, close) : (Include: true, Reason: "");
+                    ? CpuScopeFocus.Evaluate(tokens, position, close, cpuTrace.MacroName) : (Include: true, Reason: "");
                 bool addCpu = options.CpuScopes && !existingCpu && cpuPlacement.Position is not null && focus.Include;
                 bool addCounter = options.CallCounters && !existingCounter;
                 string cpuDecision = !options.CpuScopes ? "未選択" : existingCpu ? "既存の CPU 計測を維持" :
@@ -140,7 +141,7 @@ public sealed class CppInstrumenter
                 // CPU labels are intentionally short; source paths and function metadata remain in the report.
                 string cpuLabel = name.Contains("::", StringComparison.Ordinal)
                     ? string.Join(" ", name.Split("::").TakeLast(2)) : name;
-                var cpuMacro = CpuScopeMacro.Select(cpuLabel, options.CpuMacro);
+                var cpuMacro = CpuScopeMacro.Select(cpuLabel, cpuTrace);
                 // Resolve names together across the selected source tree after candidate discovery.
                 string? counter = null;
                 if (addCounter && !pendingCounters.TryGetValue(identity, out counter))
@@ -218,7 +219,7 @@ public sealed class CppInstrumenter
     }
 
     private static bool Includes(List<CppToken> includes, string file) => includes.Any(t =>
-        Regex.IsMatch(t.Text, "[\"<]ProfilingDebugging/" + Regex.Escape(file) + "[\">]"));
+        Regex.IsMatch(t.Text.Replace('\\', '/'), "[\"<]" + Regex.Escape(file) + "[\">]"));
     private static bool Identifier(string value) => Regex.IsMatch(value, @"^[A-Za-z_]\w*$");
     private static string Escape(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 }

@@ -13,7 +13,7 @@ internal sealed class PlanWindowView(Window owner)
     public TextBox Diagnostics { get; } = Find<TextBox>(owner, "DiagnosticsText");
     public DataGrid Files { get; } = Find<DataGrid>(owner, "FileList");
     public DataGrid Functions { get; } = Find<DataGrid>(owner, "FunctionList");
-    public ComboBox CpuMacro { get; } = Find<ComboBox>(owner, "CpuMacroOption");
+    public CpuTraceSettingsEditor CpuTrace { get; } = Find<CpuTraceSettingsEditor>(owner, "CpuTraceSettings");
     public CheckBox AllFunctions { get; } = Find<CheckBox>(owner, "AllFunctionsOption");
     public CodeChangePreview Preview { get; } = Find<CodeChangePreview>(owner, "PreviewText");
     public TextBlock Status { get; } = Find<TextBlock>(owner, "StatusText");
