@@ -6,7 +6,9 @@ status: todo
 
 # UEEtc 調査・実装ノート
 
-Unreal Engine の C++ ソースに Trace マクロを付けるツールの記録です。
+Unreal Engine の C++ ソースへのTrace付与と、BlueprintからのC++移植資料抽出の記録です。
+
+- [Blueprint .uassetからC++移植用の構造資料を生成（Issue #55）](blueprint-extraction.md)
 
 現行の全体像と次の機能候補:
 
