@@ -5,7 +5,13 @@
     <Grid Margin="32" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
         <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
             <TextBlock Text="Unreal Engine 開発ツール" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="まとめて付与する画面と、各機能を個別に使う画面を選べます。" Margin="0,12,0,26" />
+            <TextBlock Text="Traceの付与と、BlueprintからのC++移植資料作成を選べます。" Margin="0,12,0,26" />
+            <Button x:Name="BlueprintFeatureButton" Click="OpenBlueprint_Click" HorizontalContentAlignment="Left" Padding="20" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Blueprint → C++移植資料" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text=".uassetを読み込み、配置座標を除いたグラフ・ピン接続・既定値の資料を作成します。" Margin="0,8,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </Button>
             <Button x:Name="CombinedFeatureButton" Click="OpenCombined_Click" HorizontalContentAlignment="Left" Padding="20" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="CPU・イベント統合付与" FontSize="20" FontWeight="SemiBold" />

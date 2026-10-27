@@ -145,6 +145,7 @@ internal static class Program
             ApplyAvailabilityTests.Run(root, Assert, args.FirstOrDefault());
             WorkflowTests.Run(root, Assert, args.FirstOrDefault());
             CombinedWorkflowTests.Run(home, root, Assert, args.FirstOrDefault());
+            BlueprintWorkflowTests.Run(home, root, Assert, args.FirstOrDefault());
             Console.WriteLine($"WPF smoke: {checks} checks passed (launcher, separate windows, selection, naming, filtering, invalidation, source unchanged).");
             return 0;
         }

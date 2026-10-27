@@ -1,0 +1,45 @@
+<Window x:Class="UEEtc.Wpf.Features.BlueprintAnalysis.BlueprintAnalysisWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UEEtc - Blueprint移植資料" Width="1180" Height="860" MinWidth="900" MinHeight="650">
+    <Grid Margin="20" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="BlueprintからC++移植用の資料を作成" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Text=".uassetをドロップして解析します。対応するUE Editorで読み込み、グラフ・ピン接続・変数・既定値を資料にします。" TextWrapping="Wrap" Margin="0,8,0,12" />
+        </StackPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <TextBlock Text="Blueprint .uasset" VerticalAlignment="Center" Margin="0,0,8,6" />
+            <TextBox x:Name="AssetPath" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip=".uassetを1ファイルだけドラッグ＆ドロップできます。" />
+            <Button x:Name="BrowseAssetButton" Grid.Column="2" Content="ファイルを選択…" Click="BrowseAsset_Click" Padding="10,5" Margin="8,0,0,6" />
+            <TextBlock Grid.Row="1" Text="所属 .uproject" VerticalAlignment="Center" Margin="0,0,8,6" />
+            <TextBox x:Name="ProjectPath" Grid.Row="1" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip="自動検出できない場合やプラグインのアセットでは、依存クラスを読み込めるプロジェクトを選択してください。" />
+            <Button x:Name="BrowseProjectButton" Grid.Row="1" Grid.Column="2" Content="プロジェクト…" Click="BrowseProject_Click" Padding="10,5" Margin="8,0,0,6" />
+            <TextBlock Grid.Row="2" Text="UE Editor" VerticalAlignment="Center" Margin="0,0,8,6" />
+            <TextBox x:Name="EditorPath" Grid.Row="2" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip="プロジェクトと同じバージョンのUnrealEditor-Cmd.exeを指定してください。" />
+            <Button x:Name="BrowseEditorButton" Grid.Row="2" Grid.Column="2" Content="Editorを選択…" Click="BrowseEditor_Click" Padding="10,5" Margin="8,0,0,6" />
+            <TextBlock Grid.Row="3" Text="資料の出力先" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="OutputPath" Grid.Row="3" Grid.Column="1" Padding="7" ToolTip="UEプロジェクト外のフォルダー。アセット名・日時・IDのサブフォルダーに保存します。" />
+            <Button x:Name="BrowseOutputButton" Grid.Row="3" Grid.Column="2" Content="保存先を選択…" Click="BrowseOutput_Click" Padding="10,5" Margin="8,0,0,0" />
+        </Grid>
+        <StackPanel Grid.Row="2" Margin="0,12">
+            <CheckBox x:Name="RemoveLayoutOption" Content="ノード配置の座標・サイズを資料から除外（ゲーム内の位置・Vector・Transformは保持）" IsChecked="True" />
+            <WrapPanel Margin="0,10,0,0">
+                <Button x:Name="AnalyzeButton" Content="解析して資料を作成" Click="Analyze_Click" Padding="14,7" Margin="0,0,8,0" />
+                <Button x:Name="CancelButton" Content="中止" Click="Cancel_Click" IsEnabled="False" Padding="14,7" Margin="0,0,8,0" />
+                <Button x:Name="OpenOutputButton" Content="出力フォルダーを開く" Click="OpenOutput_Click" IsEnabled="False" Padding="14,7" />
+            </WrapPanel>
+            <TextBlock Text="元アセットの保存・C++コードの自動生成は行いません。UE起動時のSaved・キャッシュ等はUE側で作られることがあります。" TextWrapping="Wrap" Margin="0,8,0,0" />
+        </StackPanel>
+        <TabControl Grid.Row="3">
+            <TabItem Header="生成した資料"><TextBox x:Name="ReportText" IsReadOnly="True" FontFamily="Consolas" FontSize="13" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
+            <TabItem Header="診断"><TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" /></TabItem>
+        </TabControl>
+        <StackPanel Grid.Row="4" Margin="0,10,0,0">
+            <ProgressBar x:Name="Progress" Height="4" IsIndeterminate="True" Visibility="Collapsed" />
+            <TextBlock x:Name="StatusText" Text="Blueprint .uassetをドロップしてください。" TextWrapping="Wrap" Margin="0,8,0,0" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -5,9 +5,12 @@ status: todo
 ---
 
 # UEEtc
+
 UEいろいろコード
 
 Unreal Engine 関連の C# Console / WPF 開発を試すための実験リポジトリです。
+
+Blueprintの`.uasset`からC++移植用の資料も生成できます。WPFメイン画面の「Blueprint → C++移植資料」でファイルをドロップし、所属`.uproject`と対応する`UnrealEditor-Cmd.exe`を確認して解析します。ノード配置座標は標準で除外し、グラフ・ピン接続・型・変数・既定値をMarkdown/JSON/テキストへ出力します。[操作・必要な環境・独立プロジェクトの構成](wiki/blueprint-extraction.md)を参照してください。
 
 現在は C++ ソースへの Trace マクロ付与ツールを実装しています。WPF のメイン画面から「CPU・イベント統合付与」、個別の「CPU スコープ付与」「イベントカウンター付与」を開けます。統合画面では1回の解析で両方をプレビュー・適用できます。[操作と統合ロジック](wiki/tracing/combined-tracing.md)を参照してください。解析・レポート保存では元ソースを変更しません。
 
@@ -15,7 +18,7 @@ CPU のラベルは「クラス名 関数名」です。対応する `Super::同
 
 イベントカウンターは条件分岐の候補を提示し、数える意味・箇所・名前を確認して選択したファイルにだけ追加します。WPFでは解析時に変更候補のあるファイルを適用対象として選択します。[現行の使い方と構成](wiki/tracing/automatic-counter-preview.md)を参照してください。旧 Console の `--both` / `--counter-only` は既存スクリプト用の関数進入回数モードとして残しています。
 
-CPUマクロは自動・通常形・STRを選べます。UE 5.8の通常形とSTRは同じ静的ID経路で、STRは動的文字列用ではありません。[Engine調査と計測モードの使い分け](wiki/tracing/cpu-macros-and-counter-lifetimes.md)を参照してください。
+CPUの新規付与はSTR形式に統一し、独自マクロ名・定義ヘッダーも指定できます。[現行の設定方法](wiki/tracing/custom-cpu-str.md)を参照してください。UE 5.8の通常形と固定STRは同じ静的ID経路です。
 
 [調査・設計・実験結果の目次](wiki/README.md)
 
@@ -43,8 +46,10 @@ src/
     Plans/         # 共通の変更案モデル
     Reporting/     # レポート・差分出力
   UEEtc.Console/    # Console アプリ（net10.0）
+  UEEtc.Blueprint/  # Blueprint読み取り・構造解析・資料生成（既存Coreから独立、net10.0）
+  UEEtc.Blueprint.Console/ # Blueprint資料生成用の独立CLI（net10.0）
   UEEtc.Wpf/        # WPF アプリ（net10.0-windows）
-tests/             # Core 回帰テスト、WPF スモークテスト
+tests/             # Core・Blueprint回帰テスト、WPFスモークテスト
 scripts/           # C++ コンパイル確認と実プロジェクトの読み取り実験
 wiki/              # 調査結果・実装ドキュメント
 ```

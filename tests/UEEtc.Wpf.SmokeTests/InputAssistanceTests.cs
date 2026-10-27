@@ -70,7 +70,7 @@ internal static class InputAssistanceTests
         }
         finally { cpu.Close(); events.Close(); }
     }
-    private static DragEventArgs Drag(TextBox input, string[] paths, RoutedEvent routedEvent)
+    internal static DragEventArgs Drag(TextBox input, string[] paths, RoutedEvent routedEvent)
     {
         var data = new DataObject(DataFormats.FileDrop, paths);
         // WPF constructs drag arguments internally; use that constructor to exercise the actual routed handlers.
