@@ -5,4 +5,5 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup><EmbeddedResource Include="Unreal/export_blueprint.py" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="UEEtc.Blueprint.Tests" /></ItemGroup>
 </Project>

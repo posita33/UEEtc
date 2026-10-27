@@ -185,6 +185,65 @@ await WithRoot("concurrent input changes are detected without restoring another 
     await Reject<IOException>(() => new BlueprintAnalysisService(runner).AnalyzeAsync(options));
     Assert(File.ReadAllBytes(options.AssetPath).SequenceEqual(new byte[] { 9 }) && !Directory.Exists(runner.Last!.WorkDirectory));
 });
+await WithRoot("completed export tolerates only the known deprecated CVar ensure", async (root, options) =>
+{
+    var request = new EditorExportRequest(options.EditorPath, options.ProjectPath, "/Game/Sub/BP_Fixture", root);
+    foreach (string name in new[] { "Blueprint", "Class", "Defaults" }) File.WriteAllText(Path.Combine(root, name + ".copy"), "Exported");
+    File.WriteAllText(Path.Combine(root, "metadata.json"), JsonSerializer.Serialize(new
+    {
+        request.CompletionToken, request.PackagePath, EngineVersion = "5.8"
+    }));
+    string[] known = [
+        "LogOutputDevice: Error: === Handled ensure: ===",
+        "LogOutputDevice: Error: ",
+        @"LogOutputDevice: Error: Ensure condition failed: false  [File:D:\build\Engine\Source\Runtime\Core\Private\HAL\ConsoleManager.cpp] [Line: 4916]",
+        "LogOutputDevice: Error: r.Mobile.VirtualTextures is deprecated, use r.VirtualTextures in platform specific engine .ini files instead",
+        "LogOutputDevice: Error: Stack:",
+        "LogOutputDevice: Error: [Callstack] 0x123 UnrealEditor-Core.dll!FConsoleVariableShadow::GetInt() []"
+    ];
+    string[] summary = known.Select(line => "LogInit: Display: " + line).ToArray();
+    Assert(EditorExportOutcome.Validate(request, 0, []) is null);
+    Assert(EditorExportOutcome.Validate(request, 1, known.Concat(summary))!.Contains("r.Mobile.VirtualTextures"));
+    foreach (int code in new[] { -1, 2, -1073741819 })
+        await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, code, known)));
+    foreach (string extra in new[] { "LogLinker: Error: Missing dependency", "LogPython: Error: Traceback", "LogOutputDevice: Error: Another ensure message", "LogWindows: Fatal: Crash", "LogInit: Display: LogLinker: Error: Summary" })
+        await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, known.Append(extra))));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, [])));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, known.Where(line => !line.Contains("deprecated")))));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request with { CompletionToken = "stale" }, 1, known)));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request with { PackagePath = "/Game/Other" }, 1, known)));
+    File.Delete(Path.Combine(root, "Class.copy"));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, known)));
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 0, [])));
+    File.WriteAllText(Path.Combine(root, "Class.copy"), "");
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, known)));
+    File.WriteAllText(Path.Combine(root, "metadata.json"), "{broken");
+    await Reject<IOException>(() => Task.FromResult(EditorExportOutcome.Validate(request, 1, known)));
+});
+await WithRoot("failure diagnostics show initial cause before callstacks and shutdown noise", async (root, options) =>
+{
+    var request = new EditorExportRequest(options.EditorPath, options.ProjectPath, "/Game/Sub/BP_Fixture", root);
+    string[] lines = ["LogPython: Error: Failed to load Blueprint dependency", "LogOutputDevice: Error: [Callstack] ...", "LogInit: Display: Exiting..."];
+    try { EditorExportOutcome.Validate(request, 1, lines); throw new Exception("Expected failure"); }
+    catch (IOException error)
+    {
+        Assert(error.Message.Contains("Failed to load Blueprint dependency") && !error.Message.Contains("[Callstack]"));
+    }
+    await Task.CompletedTask;
+});
+await WithRoot("successful export keeps UE diagnostics in generated report", async (_, options) =>
+{
+    var exporter = ExportFixture();
+    var runner = new FakeRunner(async (request, token) =>
+    {
+        await exporter.ExportAsync(request, null, token);
+        File.WriteAllText(Path.Combine(request.WorkDirectory, "editor.log"), "UEEtc: Warning: r.Mobile.VirtualTextures startup ensure; export completed");
+    });
+    var result = await new BlueprintAnalysisService(runner).AnalyzeAsync(options);
+    Assert(result.Report.Warnings.Single().Contains("r.Mobile.VirtualTextures"));
+    Assert(File.ReadAllText(result.MarkdownPath).Contains("r.Mobile.VirtualTextures"));
+    Assert(File.ReadAllText(result.JsonPath).Contains("r.Mobile.VirtualTextures"));
+});
 await Check("Markdown encodes asset-provided HTML and table delimiters", () =>
 {
     var report = new BlueprintReport("<script>|.uasset", "/Game/Test", "Hash", "Fixture", true,
