@@ -20,6 +20,11 @@ internal static class BlueprintWorkflowTests
         string project = Path.Combine(root, "BlueprintProject"); Directory.CreateDirectory(Path.Combine(project, "Content"));
         string projectFile = Path.Combine(project, "Fixture.uproject"); File.WriteAllText(projectFile, "{\"EngineAssociation\":\"5.8\"}");
         string asset = Path.Combine(project, "Content", "BP_Test.uasset"); File.WriteAllBytes(asset, [1, 2, 3]);
+        string editorDirectory = Path.Combine(root, "Editor 日本語 Space"); Directory.CreateDirectory(editorDirectory);
+        string editorFile = Path.Combine(editorDirectory, "UnrealEditor-Cmd.EXE"); File.WriteAllBytes(editorFile, []);
+        string otherExe = Path.Combine(editorDirectory, "Other.exe"); File.WriteAllBytes(otherExe, []);
+        string outputFolder = Path.Combine(root, "BlueprintReports"); Directory.CreateDirectory(outputFolder);
+        string changedOutput = Path.Combine(root, "OtherReports"); Directory.CreateDirectory(changedOutput);
         var settings = new InputSettingsStore(Path.Combine(root, "blueprint-settings.json"));
         var service = new FakeService(root);
         var window = new BlueprintAnalysisWindow(settings, service) { Owner = home };
@@ -33,15 +38,45 @@ internal static class BlueprintWorkflowTests
             check(((CheckBox)window.FindName("RemoveLayoutOption")).IsChecked == true, "Blueprint excludes layout by default");
             check(BlueprintAnalysisWindow.DropAsset(new DataObject(DataFormats.FileDrop, new[] { asset, asset })) is null &&
                 BlueprintAnalysisWindow.DropAsset(new DataObject(DataFormats.FileDrop, new[] { projectFile })) is null, "Blueprint drop rejects multiple files and non-uasset input");
-            ((TextBox)window.FindName("OutputPath")).Text = Path.Combine(root, "BlueprintReports");
+            var projectInput = (TextBox)window.FindName("ProjectPath");
+            var editorInput = (TextBox)window.FindName("EditorPath");
+            var outputInput = (TextBox)window.FindName("OutputPath");
+            projectInput.Clear();
+            foreach (var item in new[] { (Input: projectInput, Path: projectFile), (Input: editorInput, Path: editorFile), (Input: outputInput, Path: outputFolder) })
+            {
+                var over = InputAssistanceTests.Drag(item.Input, [item.Path], UIElement.PreviewDragOverEvent);
+                var dropped = InputAssistanceTests.Drag(item.Input, [item.Path], UIElement.PreviewDropEvent);
+                check(over.Handled && over.Effects == DragDropEffects.Copy && dropped.Effects == DragDropEffects.Copy && item.Input.Text == item.Path, "Blueprint accepts the matching dropped path for " + item.Input.Name);
+            }
+            check(service.Last is null, "Dropping paths never starts Blueprint analysis automatically");
+            foreach (var item in new[] { (Input: projectInput, Invalid: asset), (Input: projectInput, Invalid: project),
+                (Input: editorInput, Invalid: otherExe), (Input: editorInput, Invalid: editorDirectory), (Input: outputInput, Invalid: asset) })
+            {
+                string original = item.Input.Text;
+                var rejected = InputAssistanceTests.Drag(item.Input, [item.Invalid], UIElement.PreviewDropEvent);
+                check(rejected.Effects == DragDropEffects.None && item.Input.Text == original, "Blueprint rejects a mismatched dropped path for " + item.Input.Name);
+            }
+            foreach (var item in new[] { (Input: projectInput, Path: projectFile), (Input: editorInput, Path: editorFile), (Input: outputInput, Path: outputFolder) })
+            {
+                var rejected = InputAssistanceTests.Drag(item.Input, [item.Path, item.Path], UIElement.PreviewDropEvent);
+                check(rejected.Effects == DragDropEffects.None && item.Input.Text == item.Path, "Blueprint rejects multiple dropped paths for " + item.Input.Name);
+            }
             Click(window, "AnalyzeButton");
             check(window.IsBusy && !input.IsEnabled && ((Button)window.FindName("CancelButton")).IsEnabled, "Blueprint analysis locks inputs and enables cancel");
+            foreach (var item in new[] { (Input: input, Path: asset), (Input: projectInput, Path: projectFile),
+                (Input: editorInput, Path: editorFile), (Input: outputInput, Path: changedOutput) })
+            {
+                var target = item.Input;
+                string original = target.Text;
+                var rejected = InputAssistanceTests.Drag(target, [item.Path], UIElement.PreviewDropEvent);
+                check(rejected.Effects == DragDropEffects.None && target.Text == original, "Blueprint rejects path drops during analysis for " + target.Name);
+            }
             Until(() => !window.IsBusy);
             check(window.Result is not null && ((TextBox)window.FindName("ReportText")).Text.Contains("Blueprint fixture report"), "Blueprint report is created and displayed");
             check(service.Last is { RemoveLayout: true } && service.Last.AssetPath == asset, "Blueprint layout and asset settings reach independent service");
             check(((Button)window.FindName("OpenOutputButton")).IsEnabled && File.ReadAllBytes(asset).SequenceEqual(new byte[] { 1, 2, 3 }), "Blueprint report enables opening output without modifying asset bytes");
             if (screenshots is not null) Program.Screenshot(window, Path.Combine(screenshots, "blueprint-analysis.png"), 1180, 860);
-            ((TextBox)window.FindName("OutputPath")).Text = Path.Combine(root, "OtherReports");
+            InputAssistanceTests.Drag(outputInput, [changedOutput], UIElement.PreviewDropEvent);
             check(window.Result is null && !((Button)window.FindName("OpenOutputButton")).IsEnabled, "Blueprint changed settings invalidate the old result");
             service.Fail = true; Click(window, "AnalyzeButton"); Until(() => !window.IsBusy);
             check(window.Result is null && ((TextBox)window.FindName("DiagnosticsText")).Text.Contains("Fixture failure"), "Blueprint errors appear inline without enabling output");
@@ -58,6 +93,7 @@ internal static class BlueprintWorkflowTests
         try
         {
             check(((TextBox)restarted.FindName("AssetPath")).Text == asset && ((TextBox)restarted.FindName("ProjectPath")).Text == projectFile, "Blueprint input paths survive settings reload");
+            check(((TextBox)restarted.FindName("EditorPath")).Text == editorFile && ((TextBox)restarted.FindName("OutputPath")).Text == changedOutput, "Blueprint dropped Editor and output paths survive settings reload");
             check(restarted.Result is null && ((CheckBox)restarted.FindName("RemoveLayoutOption")).IsChecked == true, "Blueprint restart requires analysis and restores safe layout default");
         }
         finally { restarted.Close(); }

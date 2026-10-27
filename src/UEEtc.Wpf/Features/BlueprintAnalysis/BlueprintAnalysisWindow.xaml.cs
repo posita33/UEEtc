@@ -33,19 +33,10 @@ public partial class BlueprintAnalysisWindow : Window
         };
         foreach (var input in new[] { ProjectPath, EditorPath, OutputPath }) input.TextChanged += (_, _) => Invalidate();
         RemoveLayoutOption.Click += (_, _) => Invalidate();
-        AssetPath.AllowDrop = true;
-        AssetPath.PreviewDragOver += (_, e) =>
-        {
-            e.Effects = !IsBusy && DropAsset(e.Data) is not null && e.AllowedEffects.HasFlag(DragDropEffects.Copy) ? DragDropEffects.Copy : DragDropEffects.None;
-            e.Handled = true;
-        };
-        AssetPath.PreviewDrop += (_, e) =>
-        {
-            e.Handled = true; e.Effects = DragDropEffects.None;
-            if (IsBusy || !e.AllowedEffects.HasFlag(DragDropEffects.Copy)) return;
-            if (DropAsset(e.Data) is not { } path) { StatusText.Text = ".uassetを1ファイルだけドロップしてください。"; return; }
-            AssetPath.Text = path; e.Effects = DragDropEffects.Copy;
-        };
+        FileDropInput.Attach(AssetPath, ".uasset", text => StatusText.Text = text);
+        FileDropInput.Attach(ProjectPath, ".uproject", text => StatusText.Text = text);
+        FileDropInput.Attach(EditorPath, ".exe", text => StatusText.Text = text, "UnrealEditor-Cmd.exe");
+        FolderDropInput.Attach(OutputPath, text => StatusText.Text = text);
         inputs.ReportLoadError();
     }
 
@@ -55,9 +46,7 @@ public partial class BlueprintAnalysisWindow : Window
         Result = null; OpenOutputButton.IsEnabled = false; ReportText.Clear(); DiagnosticsText.Clear();
         StatusText.Text = "設定を確認して解析してください。";
     }
-    public static string? DropAsset(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop) &&
-        data.GetData(DataFormats.FileDrop) is string[] { Length: 1 } paths && File.Exists(paths[0]) &&
-        Path.GetExtension(paths[0]).Equals(".uasset", StringComparison.OrdinalIgnoreCase) ? Path.GetFullPath(paths[0]) : null;
+    public static string? DropAsset(IDataObject data) => FileDropInput.GetFile(data, ".uasset");
 
     private async void Analyze_Click(object sender, RoutedEventArgs e)
     {
