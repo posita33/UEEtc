@@ -6,7 +6,7 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="BlueprintからC++移植用の資料を作成" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text=".uassetをドロップして解析します。対応するUE Editorで読み込み、グラフ・ピン接続・変数・既定値を資料にします。" TextWrapping="Wrap" Margin="0,8,0,12" />
+            <TextBlock Text="各パス欄に対応するファイル・フォルダーをドロップできます。UE EditorでBlueprintを読み込み、グラフ・ピン接続・変数・既定値を資料にします。" TextWrapping="Wrap" Margin="0,8,0,12" />
         </StackPanel>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -15,13 +15,13 @@
             <TextBox x:Name="AssetPath" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip=".uassetを1ファイルだけドラッグ＆ドロップできます。" />
             <Button x:Name="BrowseAssetButton" Grid.Column="2" Content="ファイルを選択…" Click="BrowseAsset_Click" Padding="10,5" Margin="8,0,0,6" />
             <TextBlock Grid.Row="1" Text="所属 .uproject" VerticalAlignment="Center" Margin="0,0,8,6" />
-            <TextBox x:Name="ProjectPath" Grid.Row="1" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip="自動検出できない場合やプラグインのアセットでは、依存クラスを読み込めるプロジェクトを選択してください。" />
+            <TextBox x:Name="ProjectPath" Grid.Row="1" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip=".uprojectを1ファイルだけドロップできます。自動検出できない場合やプラグインのアセットでは、依存クラスを読み込めるプロジェクトを指定してください。" />
             <Button x:Name="BrowseProjectButton" Grid.Row="1" Grid.Column="2" Content="プロジェクト…" Click="BrowseProject_Click" Padding="10,5" Margin="8,0,0,6" />
             <TextBlock Grid.Row="2" Text="UE Editor" VerticalAlignment="Center" Margin="0,0,8,6" />
-            <TextBox x:Name="EditorPath" Grid.Row="2" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip="プロジェクトと同じバージョンのUnrealEditor-Cmd.exeを指定してください。" />
+            <TextBox x:Name="EditorPath" Grid.Row="2" Grid.Column="1" Padding="7" Margin="0,0,0,6" ToolTip="対応するUnrealEditor-Cmd.exeを1ファイルだけドロップできます。プロジェクトと同じバージョンを指定してください。" />
             <Button x:Name="BrowseEditorButton" Grid.Row="2" Grid.Column="2" Content="Editorを選択…" Click="BrowseEditor_Click" Padding="10,5" Margin="8,0,0,6" />
             <TextBlock Grid.Row="3" Text="資料の出力先" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBox x:Name="OutputPath" Grid.Row="3" Grid.Column="1" Padding="7" ToolTip="UEプロジェクト外のフォルダー。アセット名・日時・IDのサブフォルダーに保存します。" />
+            <TextBox x:Name="OutputPath" Grid.Row="3" Grid.Column="1" Padding="7" ToolTip="フォルダーを1つだけドロップできます。UEプロジェクト外を指定してください。アセット名・日時・IDのサブフォルダーに保存します。" />
             <Button x:Name="BrowseOutputButton" Grid.Row="3" Grid.Column="2" Content="保存先を選択…" Click="BrowseOutput_Click" Padding="10,5" Margin="8,0,0,0" />
         </Grid>
         <StackPanel Grid.Row="2" Margin="0,12">
