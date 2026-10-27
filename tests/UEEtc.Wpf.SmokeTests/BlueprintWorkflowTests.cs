@@ -73,6 +73,7 @@ internal static class BlueprintWorkflowTests
             }
             Until(() => !window.IsBusy);
             check(window.Result is not null && ((TextBox)window.FindName("ReportText")).Text.Contains("Blueprint fixture report"), "Blueprint report is created and displayed");
+            check(((TextBox)window.FindName("DiagnosticsText")).Text.Contains("r.Mobile.VirtualTextures"), "Blueprint completed export retains startup warning in diagnostics");
             check(service.Last is { RemoveLayout: true } && service.Last.AssetPath == asset, "Blueprint layout and asset settings reach independent service");
             check(((Button)window.FindName("OpenOutputButton")).IsEnabled && File.ReadAllBytes(asset).SequenceEqual(new byte[] { 1, 2, 3 }), "Blueprint report enables opening output without modifying asset bytes");
             if (screenshots is not null) Program.Screenshot(window, Path.Combine(screenshots, "blueprint-analysis.png"), 1180, 860);
@@ -123,7 +124,7 @@ internal static class BlueprintWorkflowTests
             string folder = Path.Combine(root, "BlueprintGenerated", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, "analysis.md");
             await File.WriteAllTextAsync(path, "# Blueprint fixture report\n\nGraph / Nodes / Pins / Defaults", cancellationToken);
-            return new(folder, path, Path.Combine(folder, "analysis.json"), new(options.AssetPath, "/Game/BP_Test", "Fixture", "5.8", options.RemoveLayout, [], []));
+            return new(folder, path, Path.Combine(folder, "analysis.json"), new(options.AssetPath, "/Game/BP_Test", "Fixture", "5.8", options.RemoveLayout, [], ["r.Mobile.VirtualTextures startup ensure; export completed"]));
         }
     }
 }

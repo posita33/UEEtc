@@ -141,3 +141,33 @@ Issue #57のパス入力拡張ではReleaseビルド（警告・エラー0）と
 WPFはドロップイベント、自動検出、処理中の入力ロック、成功・失敗・中止、設定復元、画面配置を検証し、外部実行部分はテスト用サービスに置き換える。
 実UEでの抽出は上記の別の結合テストで検証した。
 Lyra・BlockBreaker等の既存アセットはこの検証で変更していない。
+
+## CropoutとUE 5.8の廃止CVar（Issue #59）
+
+Cropoutの`Config/DefaultEngine.ini`にある`r.Mobile.VirtualTextures=False`をUE 5.8が読み込むと、
+廃止設定として`ConsoleManager.cpp`のensureが記録される。
+`Engine/Source/Runtime/Core/Private/HAL/ConsoleManager.cpp:4910–4917`ではshadow CVarのEnsure動作が
+`ensureAlwaysMsgf`を実行する。`Engine/Source/Runtime/Launch/Private/LaunchEngineLoop.cpp:4217–4224`では
+commandlet自体が成功してもログにエラーが残ると終了コード1に変更する。
+このため、Pythonによる抽出完了とUEプロセスの終了コードは区別する必要がある。
+
+`EditorExportOutcome`で次の条件がすべて成立するときだけ、資料を警告付きで生成する。
+
+- 終了コードが1。
+- Pythonが全出力の後に書くmetadataのトークン・パッケージが今回の実行に一致し、Engineバージョンも記録されている。
+- Blueprint/Class/Defaultsの3ファイルがすべて存在し、空でない。その後の既存パーサーでも構造を検証する。
+- ログの全Error/Fatal行が既知の`r.Mobile.VirtualTextures`廃止ensureと、その位置情報・スタックだけである。
+
+資料とWPF診断タブには警告を残し、完全な`editor.log`も保存する。
+別の読み込みエラーやPython例外、未知のensure、クラッシュ、未完了・古い出力はこの例外の対象にならない。
+プロジェクトのConfigは自動変更せず、利用するUEバージョンに合わせた設定の見直しは利用者が行う。
+通常の失敗時には末尾の終了処理・スタックより、ログ内の最初の原因メッセージを優先して表示する。
+
+2026-10-28にUE 5.8で`CropoutSampleProject/Content/Blueprint/Villagers/BP_Villager.uasset`を実解析し、
+45グラフ・524ノード、表示用配置1,102プロパティの除外を確認した（コンパイラーの中間グラフも含む）。
+Blueprint/Class/Defaultsの構文診断は0件。廃止設定のEngine診断とUEEtcの継続理由を資料に残した。
+対象アセット・uprojectのSHA256不変チェックも成功した。
+ライブラリ18ケースで、既知ensureのみの継続、追加の読み込みエラー・未知ensure・Fatal・異常終了の拒否、
+古いトークン・違うパッケージ・欠落/空出力・不正metadataの拒否、資料への警告出力を検証した。
+実Editorのキャンセル後にプロセスが残らないこと、非BlueprintのMaterialが引き続き失敗することも確認した。
+通常の終了コード0での実Blueprint抽出も成功。Releaseビルドは警告・エラー0、WPFは警告表示を含む244項目が成功した。

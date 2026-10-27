@@ -34,5 +34,7 @@ export_object(unreal.get_default_object(generated), "Defaults")
 (output / "metadata.json").write_text(json.dumps({
     "AssetPath": asset.get_path_name(),
     "EngineVersion": unreal.SystemLibrary.get_engine_version(),
+    "PackagePath": request["PackagePath"],
+    "CompletionToken": request["CompletionToken"],
 }, ensure_ascii=False), encoding="utf-8")
 # Do not compile, save, rename, or modify the source asset/project.

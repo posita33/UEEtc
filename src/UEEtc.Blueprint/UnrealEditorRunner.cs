@@ -4,7 +4,10 @@ using System.Text.Json;
 
 namespace UEEtc.Blueprint;
 
-public sealed record EditorExportRequest(string EditorPath, string ProjectPath, string PackagePath, string WorkDirectory);
+public sealed record EditorExportRequest(string EditorPath, string ProjectPath, string PackagePath, string WorkDirectory)
+{
+    public string CompletionToken { get; init; } = Guid.NewGuid().ToString("N");
+}
 public interface IUnrealEditorRunner
 {
     Task ExportAsync(EditorExportRequest request, IProgress<string>? progress, CancellationToken cancellationToken);
@@ -37,9 +40,9 @@ public sealed class UnrealEditorRunner : IUnrealEditorRunner
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report("UE EditorでBlueprintを読み込み中（初回起動には時間がかかります）…");
         if (!process.Start()) throw new IOException("UnrealEditor-Cmdを起動できません。");
-        await using var log = new StreamWriter(Path.Combine(request.WorkDirectory, "editor.log"), false, new UTF8Encoding(false));
+        string logPath = Path.Combine(request.WorkDirectory, "editor.log");
+        await using var log = new StreamWriter(logPath, false, new UTF8Encoding(false));
         using var gate = new SemaphoreSlim(1, 1);
-        var tail = new Queue<string>();
         Task stdout = Read(process.StandardOutput), stderr = Read(process.StandardError);
         try { await process.WaitForExitAsync(cancellationToken); }
         catch (OperationCanceledException)
@@ -51,10 +54,13 @@ public sealed class UnrealEditorRunner : IUnrealEditorRunner
         finally
         {
             await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(15));
-            await log.FlushAsync();
+            await log.DisposeAsync();
         }
-        if (process.ExitCode != 0)
-            throw new IOException($"UE解析が終了コード{process.ExitCode}で失敗しました。Engineバージョン・依存モジュール・Blueprintを確認してください。\n" + string.Join('\n', tail));
+        cancellationToken.ThrowIfCancellationRequested();
+        if (EditorExportOutcome.Validate(request, process.ExitCode, File.ReadLines(logPath)) is { } warning)
+        {
+            await File.AppendAllTextAsync(logPath, "UEEtc: Warning: " + warning + Environment.NewLine, new UTF8Encoding(false), cancellationToken);
+        }
 
         async Task Read(StreamReader reader)
         {
@@ -64,8 +70,6 @@ public sealed class UnrealEditorRunner : IUnrealEditorRunner
                 try
                 {
                     await log.WriteLineAsync(line);
-                    tail.Enqueue(line.Length > 1000 ? line[..1000] : line);
-                    if (tail.Count > 20) tail.Dequeue();
                 }
                 finally { gate.Release(); }
             }
