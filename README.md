@@ -132,3 +132,7 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 ./scripts/Invoke-EventCounterExperiments.ps1 -RecommendedAdd
 ./scripts/Invoke-ReviewedEventCounterExamples.ps1
 ```
+
+Blueprint解析資料から手動でC++へ移した試作は
+[CropoutVillager](examples/BlueprintConversion/CropoutVillager/README.md)を参照してください。
+元BPとの対応・差分は[移植メモ](wiki/blueprint-villager-cpp-prototype.md)にまとめています。
