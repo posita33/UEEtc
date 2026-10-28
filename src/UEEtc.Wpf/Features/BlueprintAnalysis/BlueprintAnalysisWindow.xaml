@@ -28,13 +28,15 @@
             <CheckBox x:Name="RemoveLayoutOption" Content="ノード配置の座標・サイズを資料から除外（ゲーム内の位置・Vector・Transformは保持）" IsChecked="True" />
             <WrapPanel Margin="0,10,0,0">
                 <Button x:Name="AnalyzeButton" Content="解析して資料を作成" Click="Analyze_Click" Padding="14,7" Margin="0,0,8,0" />
+                <Button x:Name="ConvertButton" Content="C++へ変換（実験）" Click="Convert_Click" Padding="14,7" Margin="0,0,8,0" />
                 <Button x:Name="CancelButton" Content="中止" Click="Cancel_Click" IsEnabled="False" Padding="14,7" Margin="0,0,8,0" />
                 <Button x:Name="OpenOutputButton" Content="出力フォルダーを開く" Click="OpenOutput_Click" IsEnabled="False" Padding="14,7" />
             </WrapPanel>
-            <TextBlock Text="元アセットの保存・C++コードの自動生成は行いません。UE起動時のSaved・キャッシュ等はUE側で作られることがあります。" TextWrapping="Wrap" Margin="0,8,0,0" />
+            <TextBlock Text="C++変換は基本ノードに限定した実験です。未対応箇所は診断し、下書きのコンパイルを既定で停止します。元アセットは保存しません。UE起動時のSaved・キャッシュ等はUE側で作られることがあります。" TextWrapping="Wrap" Margin="0,8,0,0" />
         </StackPanel>
         <TabControl Grid.Row="3">
             <TabItem Header="生成した資料"><TextBox x:Name="ReportText" IsReadOnly="True" FontFamily="Consolas" FontSize="13" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
+            <TabItem Header="C++プレビュー"><TextBox x:Name="CppText" IsReadOnly="True" FontFamily="Consolas" FontSize="13" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" /></TabItem>
             <TabItem Header="診断"><TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" /></TabItem>
         </TabControl>
         <StackPanel Grid.Row="4" Margin="0,10,0,0">

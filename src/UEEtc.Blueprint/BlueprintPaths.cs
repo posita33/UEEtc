@@ -78,13 +78,13 @@ public static class BlueprintPaths
         return options with { AssetPath = asset, ProjectPath = project, EditorPath = editor, OutputRoot = output };
     }
 
-    internal static bool IsInside(string path, string root)
+    public static bool IsInside(string path, string root)
     {
         string relative = Path.GetRelativePath(Path.GetFullPath(root), Path.GetFullPath(path));
         return relative == "." || (!Path.IsPathRooted(relative) && relative != ".." &&
             !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal));
     }
-    internal static void EnsureNoLinks(string path)
+    public static void EnsureNoLinks(string path)
     {
         for (string? current = Path.GetFullPath(path); current is not null; current = Path.GetDirectoryName(current))
             if ((Directory.Exists(current) || File.Exists(current)) && File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))

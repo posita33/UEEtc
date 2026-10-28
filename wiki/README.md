@@ -26,6 +26,7 @@ Unreal Engine の C++ ソースへのTrace付与と、BlueprintからのC++移�
 - [CPU 対象の絞り込みと数量 ADD（Issue #18・#21）](tracing/focused-cpu-and-quantity-counters.md)
 - [変更プレビュー・選択・インデント・数量推奨（Issue #23・#24・#25）](tracing/preview-selection-and-indentation.md)
 - [ファイル選択・数量の自動追加・短い表示名（Issue #27〜#30）](tracing/event-files-and-input-quantities.md)
+- [.uassetからC++を生成する実験（Issue #63）](blueprint-direct-cpp.md)
 - [CPU マクロ選択とカウンターの生存区間（Issue #32・#33）](tracing/cpu-macros-and-counter-lifetimes.md)
 - [解析時のADD・DECREMENT自動設定とプレビュー（Issue #35）](tracing/automatic-counter-preview.md)
 

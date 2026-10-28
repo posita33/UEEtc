@@ -63,6 +63,7 @@ internal static class BlueprintWorkflowTests
             }
             Click(window, "AnalyzeButton");
             check(window.IsBusy && !input.IsEnabled && ((Button)window.FindName("CancelButton")).IsEnabled, "Blueprint analysis locks inputs and enables cancel");
+            check(!((Button)window.FindName("ConvertButton")).IsEnabled, "C++ conversion cannot start during analysis");
             foreach (var item in new[] { (Input: input, Path: asset), (Input: projectInput, Path: projectFile),
                 (Input: editorInput, Path: editorFile), (Input: outputInput, Path: changedOutput) })
             {
@@ -88,6 +89,18 @@ internal static class BlueprintWorkflowTests
             ((CheckBox)window.FindName("RemoveLayoutOption")).IsChecked = false;
             Click(window, "AnalyzeButton"); Until(() => !window.IsBusy);
             check(service.Last is { RemoveLayout: false }, "Blueprint keep-layout choice reaches service");
+            Click(window, "ConvertButton");
+            check(window.IsBusy && !((Button)window.FindName("AnalyzeButton")).IsEnabled, "C++ conversion locks the shared paths and analysis button");
+            Until(() => !window.IsBusy);
+            check(((TextBox)window.FindName("CppText")).Text.Contains("#error") && ((TextBox)window.FindName("ReportText")).Text.Contains("未対応"), "C++ draft preview exposes unsupported fixture data");
+            check(((TextBlock)window.FindName("StatusText")).Text.Contains("下書き") && ((Button)window.FindName("OpenOutputButton")).IsEnabled, "C++ draft is distinguished from a complete conversion and can be opened");
+            input.Text += "x";
+            check(((TextBox)window.FindName("CppText")).Text.Length == 0, "Changing a conversion path invalidates C++ preview");
+            input.Text = asset;
+            service.WaitForCancellation = true;
+            Click(window, "ConvertButton"); Click(window, "CancelButton"); Until(() => !window.IsBusy);
+            check(window.Result is null && ((TextBox)window.FindName("CppText")).Text.Length == 0 && ((TextBlock)window.FindName("StatusText")).Text.Contains("中止"), "C++ conversion cancellation leaves no completed preview");
+            service.WaitForCancellation = false;
         }
         finally { window.Close(); }
         var restarted = new BlueprintAnalysisWindow(new InputSettingsStore(settings.Path), service);
