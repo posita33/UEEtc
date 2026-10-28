@@ -1,0 +1,10 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1",
+  "FriendlyName": "Cropout Villager C++ Prototype",
+  "Description": "Manual BP_Villager migration experiment; requires Blueprint interface adapters for Cropout integration.",
+  "Category": "UEEtc Experiments",
+  "CanContainContent": true,
+  "Modules": [{ "Name": "CropoutVillager", "Type": "Runtime", "LoadingPhase": "Default" }]
+}
