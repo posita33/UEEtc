@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\UEEtc.Core\UEEtc.Core.csproj" />
     <ProjectReference Include="..\UEEtc.Blueprint\UEEtc.Blueprint.csproj" />
+    <ProjectReference Include="..\UEEtc.Blueprint.Cpp\UEEtc.Blueprint.Cpp.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

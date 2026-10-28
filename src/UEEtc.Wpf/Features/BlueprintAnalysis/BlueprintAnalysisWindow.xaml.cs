@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using UEEtc.Blueprint;
+using UEEtc.Blueprint.Cpp;
 using UEEtc.Wpf.InputAssistance;
 
 namespace UEEtc.Wpf.Features.BlueprintAnalysis;
@@ -43,12 +44,14 @@ public partial class BlueprintAnalysisWindow : Window
     private void Invalidate()
     {
         if (IsBusy) return;
-        Result = null; OpenOutputButton.IsEnabled = false; ReportText.Clear(); DiagnosticsText.Clear();
+        Result = null; OpenOutputButton.IsEnabled = false; ReportText.Clear(); DiagnosticsText.Clear(); CppText.Clear();
         StatusText.Text = "設定を確認して解析してください。";
     }
     public static string? DropAsset(IDataObject data) => FileDropInput.GetFile(data, ".uasset");
 
-    private async void Analyze_Click(object sender, RoutedEventArgs e)
+    private async void Analyze_Click(object sender, RoutedEventArgs e) => await Run(false);
+    private async void Convert_Click(object sender, RoutedEventArgs e) => await Run(true);
+    private async Task Run(bool convert)
     {
         if (IsBusy) return;
         Invalidate();
@@ -57,12 +60,25 @@ public partial class BlueprintAnalysisWindow : Window
         try
         {
             var progress = new Progress<string>(text => StatusText.Text = text);
-            var result = await Task.Run(() => service.AnalyzeAsync(options, progress, cts.Token), cts.Token);
+            BlueprintCppResult? conversion = null;
+            var result = await Task.Run(async () =>
+            {
+                if (!convert) return await service.AnalyzeAsync(options, progress, cts.Token);
+                conversion = await new BlueprintCppConversionService(service).ConvertAsync(options, progress, cts.Token);
+                return conversion.Analysis;
+            }, cts.Token);
             cts.Token.ThrowIfCancellationRequested();
             ReportText.Text = await File.ReadAllTextAsync(result.MarkdownPath, cts.Token);
             Result = result;
             DiagnosticsText.Text = string.Join(Environment.NewLine, result.Report.Warnings.Concat(result.Report.Documents.SelectMany(d => d.Warnings)));
             StatusText.Text = "資料を作成しました: " + result.Directory;
+            if (conversion is not null)
+            {
+                CppText.Text = conversion.Code.Header + Environment.NewLine + conversion.Code.Implementation;
+                ReportText.Text = BlueprintCppConversionService.Markdown(conversion.Code) + Environment.NewLine + ReportText.Text;
+                DiagnosticsText.Text += Environment.NewLine + string.Join(Environment.NewLine, conversion.Code.Diagnostics.Select(d => $"{d.Severity}: {d.Graph}/{d.Node}: {d.Message}"));
+                StatusText.Text = (conversion.Code.IsComplete ? "C++を生成しました。ビルドと動作確認が必要です: " : "未対応箇所のあるC++の下書きを生成しました: ") + conversion.Directory;
+            }
         }
         catch (OperationCanceledException) { StatusText.Text = "解析を中止しました。"; }
         catch (Exception error) { DiagnosticsText.Text = error.Message; StatusText.Text = "解析できませんでした。診断タブを確認してください。"; }
@@ -72,7 +88,7 @@ public partial class BlueprintAnalysisWindow : Window
     {
         IsBusy = value;
         foreach (var control in new UIElement[] { AssetPath, ProjectPath, EditorPath, OutputPath, RemoveLayoutOption,
-            BrowseAssetButton, BrowseProjectButton, BrowseEditorButton, BrowseOutputButton, AnalyzeButton }) control.IsEnabled = !value;
+            BrowseAssetButton, BrowseProjectButton, BrowseEditorButton, BrowseOutputButton, AnalyzeButton, ConvertButton }) control.IsEnabled = !value;
         CancelButton.IsEnabled = value; OpenOutputButton.IsEnabled = !value && Result is not null;
         Progress.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }

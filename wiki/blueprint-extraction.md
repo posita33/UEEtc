@@ -6,6 +6,9 @@ status: todo
 
 # BlueprintからC++移植用の資料を生成する（Issue #55）
 
+Issue #63で追加した「C++へ変換（実験）」は[実験的コンバーター](blueprint-direct-cpp.md)を参照。
+以下は従来の資料生成の説明である。
+
 ## WPFでの操作
 
 1. メイン画面の「Blueprint → C++移植資料」を開く。

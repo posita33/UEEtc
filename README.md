@@ -47,6 +47,7 @@ src/
     Reporting/     # レポート・差分出力
   UEEtc.Console/    # Console アプリ（net10.0）
   UEEtc.Blueprint/  # Blueprint読み取り・構造解析・資料生成（既存Coreから独立、net10.0）
+  UEEtc.Blueprint.Cpp/ # 抽出グラフからC++を生成する実験的コンバーター（net10.0）
   UEEtc.Blueprint.Console/ # Blueprint資料生成用の独立CLI（net10.0）
   UEEtc.Wpf/        # WPF アプリ（net10.0-windows）
 tests/             # Core・Blueprint回帰テスト、WPFスモークテスト
@@ -136,3 +137,6 @@ dotnet run --project tests/UEEtc.Wpf.SmokeTests --configuration Release
 Blueprint解析資料から手動でC++へ移した試作は
 [CropoutVillager](examples/BlueprintConversion/CropoutVillager/README.md)を参照してください。
 元BPとの対応・差分は[移植メモ](wiki/blueprint-villager-cpp-prototype.md)にまとめています。
+
+`.uasset`からC++を生成する[実験的コンバーター](wiki/blueprint-direct-cpp.md)も利用できます。
+Blueprint画面の「C++へ変換（実験）」またはConsoleの`--cpp`で実行します。未対応箇所を含む生成物は下書きとして扱います。
